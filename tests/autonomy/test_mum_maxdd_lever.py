@@ -53,7 +53,11 @@ def _mum_maxdd(m):
     for c in m.live_strategies():
         if c.bot == "freqtrade-mum":
             return c.protections["maxdd"]
-    pytest.fail("freqtrade-mum is not in the live roster")
+    # `raise`, not `pytest.fail(...)`: the latter does raise, but statically this
+    # function then mixes an explicit return with an implicit fall-through that
+    # would yield None — CodeQL flagged exactly that, and a helper which can
+    # silently hand a None to every assertion below is worth the one extra word.
+    raise AssertionError("freqtrade-mum is not in the live roster")
 
 
 def teardown_module(_m):
