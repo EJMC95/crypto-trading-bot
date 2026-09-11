@@ -146,9 +146,17 @@ variables would all be defeated by one careless `export`.
 Plus: no `runtime/KILL_SWITCH`, and a configuration inside every hard ceiling.
 
 There is **no `--yes` flag**, and adding one would defeat lock 4. The only
-bypass in the package is `PAPER_SOAK_OVERRIDE`, which relaxes lock 5 alone, is
-recorded in the gate's own check map, and is printed in the banner — so a
-bypassed soak can never look like a passed one.
+bypass in the package is `PAPER_SOAK_OVERRIDE`, and it is narrower than its
+name suggests: it relaxes the **days and trades bar** and nothing else. A soak
+report must still **exist** and have **passed its own checks**, so the override
+can shorten a soak — it cannot skip one. It is recorded in the gate's own check
+map and printed in the banner, so a bypassed soak never looks like a passed
+one.
+
+Verified adversarially: with `ENABLE_LIVE_TRADING=true`,
+`LIVE_CONFIRMATION` correct, `PAPER_SOAK_OVERRIDE=true` and the confirmation
+phrase typed, the gate still refuses — on `paper_report_exists` and
+`paper_checks_passed`.
 
 ---
 

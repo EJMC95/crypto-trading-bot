@@ -291,3 +291,23 @@ def test_the_declared_dependencies_are_the_ones_actually_imported():
         imported_dists |= dist_of.get(mod, {mod})
     unused = declared - imported_dists
     assert not unused, f"declared and never imported: {unused}"
+
+
+def test_the_soak_override_cannot_conjure_a_soak_out_of_nothing(cfg):
+    """MEASURED by trying hard to open the gate with the shipped live.yaml.
+
+    `PAPER_SOAK_OVERRIDE` relaxes the DAYS and TRADES bar -- and nothing else.
+    A report must still EXIST and have PASSED its own checks, so the override
+    can shorten a soak, never skip one. Stronger than the variable's name
+    suggests, which is exactly why it is pinned: a reader who assumed the
+    opposite would be assuming in the dangerous direction."""
+    g = gate(cfg, PAPER_SOAK_OVERRIDE="true")
+    got = g.evaluate(**{**ALL_OK, "paper_days": 0.0, "paper_trades": 0,
+                        "paper_report_exists": False,
+                        "paper_checks_passed": False})
+    assert not got.allowed
+    assert "paper_report_exists" in got.blockers
+    assert "paper_checks_passed" in got.blockers
+    # ...and the bar it DOES relax is relaxed, so the test is not passing for
+    # the wrong reason.
+    assert got.checks["paper_soak_complete"] is True
