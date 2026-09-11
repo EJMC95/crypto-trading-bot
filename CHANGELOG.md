@@ -575,6 +575,51 @@ source-derived number with a runtime-derived one measures the harness as much as
 file.
   ENFORCED BY: `scripts/session_state.py::_source_row_counts`,
   `scripts/session_state.py::selftest`
+
+**[SAME DAY — CODEQL'S ELEVEN WARNINGS, TRIAGED ONE BY ONE, AND ONE OF THEM WAS A TEST
+THAT PROVED NOTHING.]** `github-advanced-security` left eleven review comments on the two
+new packages. Nine are hygiene and were fixed as such: a redundant local `import json`; a
+`Store` closed in a `finally` where the class is already a context manager (now `with`);
+three empty `except` clauses, each given the reason it swallows rather than a
+`# noqa`; a discarded Bollinger mid-band; and `import *` from the helper modules, closed
+by giving each an explicit `__all__`.
+
+**THE TENTH WAS A DEFECT, AND CODEQL FOUND IT AS `ok is not used`.**
+`test_admissible_enforces_score_reward_risk_and_distance` computed the baseline
+admissibility verdict, **threw it away**, and asserted only that a `minimum_score=99.0`
+config refuses — so it carried the name of three properties and the evidence for one.
+Writing the missing positive control **failed on its first run**: the fixture's signal
+scores **66.6** against that test's own `minimum_score=70.0`, so it was **already
+inadmissible**, and the refusal the test asserted at 99.0 was produced by the BASELINE,
+not by the bar under test. Then the reward/risk limb failed too, for a second reason:
+each strict variant was a fresh `StrategyConfig` carrying the DEFAULT bars, and
+`admissible` returns on the FIRST failing one — so the assertion read a **score** refusal
+and called it reward/risk. Both are the same shape: **a refusal is only evidence about
+the bar you moved if every other bar is held where it passes.** Variants are now
+`dataclasses.replace` of the control config, one bar at a time.
+
+**MEASURED, not argued — the same six mutations against both versions of the test:**
+the old one killed **2 of 6**, the new one **6 of 6**. The survivor that matters is
+`admissible` replaced by a **constant refusal on score**: the function could have stopped
+being a function and the old test stayed green.
+
+**THE ELEVENTH: `now` accepted, normalised, and never read** — in
+`consecutive_loss_multiplier`, in BOTH packages. Not a time bug; the opposite. A
+consecutive-loss streak is an ORDER property of the closed entries, so ignoring the clock
+is CORRECT — but taking the parameter and normalising it implied a time-dependence the
+rule does not have, and two tests passed timestamps (`1000.0`, `2000.0`) that read as the
+cause of a change they had nothing to do with. The dead normalisation is gone, `del now`
+says why at the call site, and a new assertion pins the invariance: **the same entries
+give the same multiplier at clock 0, at 10^12, and with no clock at all.** The 24h
+lockout beside it is the one that genuinely reads time, and now the difference is
+visible.
+
+**AND THE FIRST ATTEMPT AT THE `__all__` FIX BROKE BOTH HELPER MODULES** — the generator
+inserted before `n.lineno`, which for a decorated function is the `def` line, **not** the
+first decorator, so the block landed between `@pytest.fixture` and its function. It was a
+`SyntaxError`, i.e. the loudest possible failure, which is the only reason it cost a
+minute instead of a session: the same off-by-a-decorator against a non-syntax boundary
+would have silently de-registered a fixture.
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —

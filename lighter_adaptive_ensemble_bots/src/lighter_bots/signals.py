@@ -97,7 +97,8 @@ class SeriesCache:
         self.macd_hist = ind.macd(self.c)[2]
         self.roc = ind.roc(self.c, 10)
         self.adx = ind.adx(self.h, self.l, self.c, 14)
-        self.bb_lo, _mid, self.bb_hi = ind.bollinger(self.c, 20, 2.0)
+        # the middle band is the 20-SMA and nothing here reads it
+        self.bb_lo, _, self.bb_hi = ind.bollinger(self.c, 20, 2.0)
 
     def at(self, i: int) -> dict[str, Any] | None:
         """The context for bar `i`. None when the bar is inside the warm-up

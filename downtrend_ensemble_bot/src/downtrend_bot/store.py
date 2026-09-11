@@ -93,6 +93,12 @@ class Store:
         self.db.commit()
 
     def close(self) -> None:
+        # A failing close is SWALLOWED on purpose. This runs from `__exit__`
+        # and from `finally` blocks, where raising would replace whatever sent
+        # us here -- and the original exception is the one worth reading. The
+        # connection is being abandoned either way; sqlite has already
+        # committed or rolled back each write at its own boundary, so there is
+        # no unflushed state for a raise here to save.
         try:
             self.db.close()
         except sqlite3.Error:

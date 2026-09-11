@@ -252,7 +252,18 @@ def test_consecutive_losses_shrink_the_next_size(cfg):
                        score=80.0, price=100.0, now=k * 600.0)
         b.record_exit(symbol=SYMS[0], signal_id=f"y{k}", pnl=-5.0,
                       now=k * 600.0)
-    assert b.consecutive_loss_multiplier(2000.0) < full
+    cut = b.consecutive_loss_multiplier(2000.0)
+    assert cut < full and cut == 0.75
+    # THE STREAK IS AN ORDER PROPERTY, NOT A TIME WINDOW. The same entries
+    # give the same multiplier at any clock -- including one BEFORE they were
+    # recorded, and none at all. `consecutive_loss_multiplier` takes `now` for
+    # symmetry with the other budget methods and deliberately ignores it (the
+    # 24h LOCKOUT is the one that reads the clock). Pinned here so the
+    # timestamps above cannot be mistaken for the cause of the change, and so
+    # a future session cannot quietly make this time-dependent.
+    assert b.consecutive_loss_multiplier(0.0) == cut
+    assert b.consecutive_loss_multiplier(10.0 ** 12) == cut
+    assert b.consecutive_loss_multiplier() == cut
 
 
 def test_the_budget_prunes_against_the_data_not_the_wall_clock(cfg, tmp_path):

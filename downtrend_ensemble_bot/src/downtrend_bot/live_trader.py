@@ -72,12 +72,9 @@ def preflight(cfg: AppConfig, adapter: ExchangeAdapter, *,
     except Exception as exc:                                # noqa: BLE001
         positions, venue_ok = [], False
         detail["venue_error"] = repr(exc)
-    store = Store(cfg.state_db)
-    try:
-        from .store import reconcile
+    from .store import reconcile
+    with Store(cfg.state_db) as store:
         rec = reconcile(store, positions) if venue_ok else {"clean": False}
-    finally:
-        store.close()
     detail["reconcile"] = rec
 
     protective = (adapter.capability("native_stop")

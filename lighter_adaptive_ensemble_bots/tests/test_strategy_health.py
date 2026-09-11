@@ -219,7 +219,18 @@ def test_two_consecutive_losses_cut_risk_a_quarter(tmp_path):
         b.record_entry(symbol=f"S{i}", strategy="s", signal_id=f"x{i}",
                        now=float(i))
         b.record_exit(symbol=f"S{i}", signal_id=f"x{i}", pnl=-1.0, now=float(i))
-    assert b.consecutive_loss_multiplier(now=100.0) == pytest.approx(0.75)
+    cut = b.consecutive_loss_multiplier(now=100.0)
+    assert cut == pytest.approx(0.75)
+    # THE STREAK IS AN ORDER PROPERTY, NOT A TIME WINDOW. The same entries
+    # give the same multiplier at any clock -- including one BEFORE they were
+    # recorded, and none at all. `consecutive_loss_multiplier` takes `now` for
+    # symmetry with the other budget methods and deliberately ignores it (the
+    # 24h LOCKOUT is the one that reads the clock). Pinned here so the
+    # timestamps above cannot be mistaken for the cause of the change, and so
+    # a future session cannot quietly make this time-dependent.
+    assert b.consecutive_loss_multiplier(now=0.0) == cut
+    assert b.consecutive_loss_multiplier(now=10.0 ** 12) == cut
+    assert b.consecutive_loss_multiplier() == cut
 
 
 def test_budget_survives_a_restart(tmp_path):

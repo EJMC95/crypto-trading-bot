@@ -25,6 +25,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
 from lighter_bots.models import Candle, MarketMeta   # noqa: E402
 
 
+__all__ = [          # the export surface `conftest` re-exports;
+                     # without it `import *` pulls this module's own
+                     # imports into every test file
+    "cfg",
+    "make_market",
+    "make_runner",
+    "market",
+    "ramp",
+    "read_text",
+    "registry",
+    "write_text",
+]
+
+
 def make_market(symbol="BTC", market_id=1, **kw):
     base = dict(symbol=symbol, market_id=market_id, tick_size=0.1,
                 qty_step=0.00001, min_base_amount=0.0001,

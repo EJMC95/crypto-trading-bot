@@ -266,8 +266,6 @@ def cmd_make_examples(cfg: AppConfig, args) -> int:
     It exists as a command rather than as committed data because the data is
     generated: shipping megabytes of regenerable JSON in git buys nothing, and
     a reader who runs this gets byte-identical tapes from the same seed."""
-    import json
-
     from .models import contained_path, safe_filename
     from .synthetic import tapes
 

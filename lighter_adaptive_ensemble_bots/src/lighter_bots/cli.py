@@ -302,14 +302,18 @@ def cmd_report(args) -> int:
             try:
                 with open(target) as fh:
                     print(json.dumps(json.load(fh), indent=1)[:4000])
-            except (OSError, ValueError):
-                pass
+            except (OSError, ValueError) as exc:
+                # One unreadable or half-written report must not stop the
+                # listing: the next file is often the one being looked for.
+                # Named, never silent -- a report that vanished between the
+                # directory scan and the open is worth seeing.
+                print(f"    unreadable: {type(exc).__name__}")
         else:
             try:
                 with open(target) as fh:
                     print(fh.read()[:4000])
-            except OSError:
-                pass
+            except OSError as exc:
+                print(f"    unreadable: {type(exc).__name__}")
         found = True
     if not found:
         print("no reports found")

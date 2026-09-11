@@ -1,5 +1,7 @@
 """Scoring: the components, the bars, and the two failure modes that matter --
 a component that can never fire, and one that fires on everything."""
+import dataclasses as dc
+
 import pytest
 
 from dt_helpers import (breakdown_tape, falling, flat,
@@ -229,17 +231,70 @@ def test_reward_risk_is_measured_to_the_last_defined_target():
 
 
 def test_admissible_enforces_score_reward_risk_and_distance():
-    st = StrategyConfig(minimum_score=70.0, minimum_reward_risk=1.8,
+    """All THREE bars, each shown to REFUSE, against a signal shown to PASS.
+
+    This test used to compute the baseline verdict and throw it away, asserting
+    only the score bar -- so it carried the name of three properties and the
+    evidence for one. Without the positive control the refusals prove nothing
+    either: a signal that is inadmissible for an unrelated reason refuses under
+    every strict config too, and the test goes green on a dead fixture. CodeQL
+    found it as `ok is not used`, which is what an assertion that was never
+    written looks like from outside.
+
+    AND THE CONTROL FAILED THE MOMENT IT WAS WRITTEN: the fixture's signal
+    scores 66.6, so at the old config's `minimum_score=70.0` it was ALREADY
+    inadmissible -- the refusal the test asserted at 99.0 was guaranteed by the
+    baseline, not caused by the bar under test. A `minimum_score` that read the
+    BASE config instead of the strict one would have passed it. The bar here is
+    60.0 so the control clears it; this is a test about the BARS, not about how
+    well the fixture happens to score."""
+    st = StrategyConfig(minimum_score=60.0, minimum_reward_risk=1.8,
                         max_entry_distance_atr=0.75)
     sig, _r = S.evaluate("BTC/USDT:USDT", breakdown_tape(300), "short",
                          regime=Regime.BEARISH, cfg=st,
                          symbol_bearish_ok=True, spread_bps=2.0)
     if sig is None:
         pytest.skip("no signal on the control tape")
-    ok, _why = S.admissible(sig, st, Regime.BEARISH)
-    strict = StrategyConfig(minimum_score=99.0)
-    ok2, why2 = S.admissible(sig, strict, Regime.BEARISH)
-    assert not ok2 and "score" in why2
+
+    # THE POSITIVE CONTROL. Every refusal below is only informative because
+    # this signal clears the shipped bars.
+    ok, why = S.admissible(sig, st, Regime.BEARISH)
+    assert ok, f"the control signal is not admissible at the shipped bars: {why}"
+    assert why == "admissible"
+
+    # EACH VARIANT MOVES EXACTLY ONE BAR AND HOLDS THE REST AT THE CONTROL'S
+    # VALUES. A bare `StrategyConfig(minimum_reward_risk=99.0)` carries the
+    # DEFAULT minimum_score of 70.0, which this 66.6 signal fails first -- so
+    # the assertion would have read a score refusal and called it reward/risk.
+    # `admissible` returns on the FIRST failing bar, so a single-bar test that
+    # lets a second bar move measures whichever one happens to be checked
+    # earlier.
+    one = lambda **kw: dc.replace(st, **kw)              # noqa: E731
+
+    # 1/3 score
+    ok_s, why_s = S.admissible(sig, one(minimum_score=99.0), Regime.BEARISH)
+    assert not ok_s and "score" in why_s, why_s
+
+    # 2/3 reward/risk. The knob measured INERT at shipped values (targets are
+    # fixed R-multiples of the stop, so RR is `tp2_r` by construction) -- which
+    # is exactly why the bar itself must be shown to still BITE when it is set
+    # above that constant, or "inert" quietly becomes "unwired".
+    ok_r, why_r = S.admissible(sig, one(minimum_reward_risk=99.0),
+                               Regime.BEARISH)
+    assert not ok_r and "reward/risk" in why_r, why_r
+
+    # 3/3 distance from the trigger level -- reachable only on a signal that
+    # HAS one, so an absent trigger is reported, never skipped past.
+    assert sig.trigger_level is not None, (
+        "the breakdown fixture produced no trigger level, so the distance bar "
+        "is untested here -- fix the fixture rather than dropping the limb")
+    ok_d, why_d = S.admissible(sig, one(max_entry_distance_atr=0.0),
+                               Regime.BEARISH)
+    assert not ok_d and "ATR from the trigger level" in why_d, why_d
+
+    # and the bump arguments are the same bars by another route
+    ok_b, why_b = S.admissible(sig, st, Regime.BEARISH, score_bump=100.0)
+    assert not ok_b and "score" in why_b, why_b
 
 
 def test_a_refused_signal_always_carries_a_reason():

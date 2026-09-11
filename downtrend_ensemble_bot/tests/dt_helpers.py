@@ -28,6 +28,23 @@ from downtrend_bot.synthetic import make_market, walk  # noqa: E402
 SYMS = ["BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT"]
 
 
+__all__ = [          # the export surface `conftest` re-exports;
+                     # without it `import *` pulls this module's own
+                     # imports into every test file
+    "SYMS",
+    "bars",
+    "breakdown_tape",
+    "cfg",
+    "falling",
+    "flat",
+    "markets",
+    "overrun_pivot_tape",
+    "read_text",
+    "rising",
+    "tape",
+]
+
+
 @pytest.fixture
 def cfg(tmp_path) -> AppConfig:
     c = AppConfig()

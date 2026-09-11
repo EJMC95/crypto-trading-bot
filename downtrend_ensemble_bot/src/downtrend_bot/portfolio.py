@@ -335,8 +335,19 @@ class TradeBudget:
         self.regime_transition_entries = 0
 
     def consecutive_loss_multiplier(self, now: float | None = None) -> float:
-        """Spec 26E: after 2 consecutive losses, cut risk 25%."""
-        now = time.time() if now is None else now
+        """Spec 26E: after 2 consecutive losses, cut risk 25%.
+
+        `now` is ACCEPTED AND DELIBERATELY UNUSED, and that is the finding
+        worth recording rather than hiding: a consecutive-loss streak is an
+        ORDER property of the closed entries, not a time window. Two losses a
+        fortnight old still bind if nothing has closed since -- which is the
+        intended reading, and exactly what separates this from the 24h loss
+        LOCKOUT above, which is a time count and does read the clock. The
+        parameter stays because every caller passes one positionally and the
+        sibling budget methods all take it; normalising it here and then
+        ignoring it implied a time-dependence this rule does not have.
+        """
+        del now                                  # order, not time -- see above
         closed = [e for e in sorted(self.entries, key=lambda e: e.ts)
                   if e.outcome in ("win", "loss", "breakeven")]
         streak = 0
