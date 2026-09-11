@@ -251,10 +251,14 @@ def reconcile(store: Store, venue_positions: Sequence[Position]
         if not o["protective_ok"]:
             unprotected.append({"symbol": sym,
                                 "why": "no protective stop recorded"})
-    for sym, o in ours.items():
-        if sym not in theirs:
-            ghosts.append({"symbol": sym, "side": o["side"],
-                           "quantity": o["quantity"],
+    # Distinct names on purpose: the loop above already binds `sym`/`o`, and
+    # reusing them here is what CodeQL flagged as a potentially-uninitialized
+    # use. Shadowing across two loops in one function is confusing whether or
+    # not the analyser is strictly right.
+    for our_sym, ours_row in ours.items():
+        if our_sym not in theirs:
+            ghosts.append({"symbol": our_sym, "side": ours_row["side"],
+                           "quantity": ours_row["quantity"],
                            "why": "in our book, absent at the venue"})
     clean = not (orphans or ghosts or mismatched or unprotected)
     out = {"clean": clean, "orphans": orphans, "ghosts": ghosts,

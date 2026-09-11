@@ -9,7 +9,7 @@ import types
 
 import pytest
 
-from conftest import SYMS, tape
+from dt_helpers import SYMS, tape
 from downtrend_bot import fleet_publish as FP
 
 

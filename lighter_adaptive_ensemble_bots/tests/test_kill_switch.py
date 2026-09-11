@@ -6,7 +6,7 @@ import pytest
 from lighter_bots import health as H
 from lighter_bots.config import AppConfig, LiveGate, flatten_confirmed
 from lighter_bots.models import Regime
-from conftest import ramp
+from lb_helpers import ramp
 
 ENV_OK = {
     "ENABLE_LIVE_TRADING": "true",

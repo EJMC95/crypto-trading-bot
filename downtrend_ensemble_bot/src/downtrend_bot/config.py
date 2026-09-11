@@ -71,6 +71,14 @@ class RiskConfig:
 @dataclass
 class StrategyConfig:
     minimum_score: float = 70.0
+    #: MEASURED INERT on the shipped tapes, and for a STRUCTURAL reason:
+    #: `targets` are fixed R-multiples of the stop, so a signal's reward/risk
+    #: is `tp2_r` BY CONSTRUCTION and this bar can never bind below it. The
+    #: 40-cell sweep confirms it (spread 0.000pp across 1.4/1.8/2.2). Declared
+    #: rather than deleted -- it DOES bind above tp2_r, and the regime engine's
+    #: `neutral_minimum_reward_risk` raises it -- and declared rather than
+    #: quietly left inert, because a knob that reaches no decision is exactly
+    #: what someone tunes for a day before finding out.
     minimum_reward_risk: float = 1.8
     adx_threshold: float = 20.0
     max_entry_distance_atr: float = 0.75

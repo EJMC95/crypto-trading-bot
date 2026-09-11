@@ -140,7 +140,7 @@ def test_leverage_never_exceeds_the_market_maximum(registry):
 
 
 def test_incomplete_metadata_refuses(registry):
-    from conftest import make_market
+    from lb_helpers import make_market
     from lighter_bots.market_metadata import MarketRegistry
     reg = MarketRegistry([make_market("BTC", max_leverage=None)])
     d = _size(reg)

@@ -104,7 +104,7 @@ def test_the_runner_publishes_every_cycle_and_records_the_answer(monkeypatch):
                             publish=lambda **kw: calls.append(kw) or True))
     monkeypatch.setenv("DATABASE_URL", "postgres://x")
 
-    from conftest import make_runner
+    from lb_helpers import make_runner
     runner = make_runner()
     runner.cycle(["BTC", "ETH"], now=1_700_000_000.0)
     assert calls, "the cycle did not publish"
@@ -122,7 +122,7 @@ def test_a_cycle_outside_the_fleet_still_completes(monkeypatch):
     database the cycle must run to completion and simply report published
     False."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    from conftest import make_runner
+    from lb_helpers import make_runner
     runner = make_runner()
     out = runner.cycle(["BTC", "ETH"], now=1_700_000_000.0)
     assert out["published"] is False and runner.published is False
@@ -161,7 +161,7 @@ def test_a_finished_run_publishes_a_terminal_row_that_explains_itself(
                         types.SimpleNamespace(
                             publish=lambda **kw: calls.append(kw) or True))
     monkeypatch.setenv("DATABASE_URL", "postgres://x")
-    from conftest import make_runner
+    from lb_helpers import make_runner
     runner = make_runner()
     runner.cycle(["BTC", "ETH"], now=1_700_000_000.0)
     assert calls[-1]["status"] == "paper"
@@ -191,7 +191,7 @@ def test_paper_fills_are_never_kinder_than_the_backtest():
     backtest it validates. Entries were booked at the exact signal price and
     exits at the exact mark while the backtester charged spread and slippage
     on both."""
-    from conftest import make_runner
+    from lb_helpers import make_runner
     r = make_runner()
     assert r._adverse(100.0, "long", closing=False) > 100.0
     assert r._adverse(100.0, "short", closing=False) < 100.0
@@ -205,7 +205,7 @@ def test_a_flat_paper_round_trip_loses_money():
     round trip is one whose costs are not wired in -- which reads identically
     to a book with an edge."""
     from lighter_bots.models import Position
-    from conftest import make_runner
+    from lb_helpers import make_runner
     r = make_runner()
     before = r.state.equity
     entry = r._adverse(100.0, "short", closing=False)

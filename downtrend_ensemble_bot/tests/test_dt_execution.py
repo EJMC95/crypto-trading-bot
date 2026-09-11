@@ -1,7 +1,7 @@
 """Order construction, the reduce-only rule, and the monotone-stop invariant."""
 import pytest
 
-from conftest import SYMS
+from dt_helpers import SYMS
 from downtrend_bot.config import ExecutionConfig, StrategyConfig
 from downtrend_bot.execution import (Plan, acceptable_fill, breakeven_stop,
                                      build_plan, choose_entry_order,

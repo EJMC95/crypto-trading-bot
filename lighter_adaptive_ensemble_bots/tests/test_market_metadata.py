@@ -3,7 +3,7 @@ import pytest
 
 from lighter_bots.market_metadata import (BPS, MarketRegistry, MetadataStore,
                                           parse_market)
-from conftest import make_market
+from lb_helpers import make_market
 
 ROW = {"symbol": "BTC", "market_id": 1, "price_decimals": 1, "size_decimals": 5,
        "min_base_amount": "0.00010", "min_quote_amount": "10.000000",

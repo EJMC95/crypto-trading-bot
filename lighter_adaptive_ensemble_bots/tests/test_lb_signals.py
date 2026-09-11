@@ -4,7 +4,7 @@ import pytest
 from lighter_bots import signals as S
 from lighter_bots.config import StrategyConfig
 from lighter_bots.models import Regime, ScoreBreakdown
-from conftest import ramp
+from lb_helpers import ramp
 
 
 def test_weights_sum_to_one_hundred():

@@ -2,7 +2,7 @@
 a component that can never fire, and one that fires on everything."""
 import pytest
 
-from conftest import (breakdown_tape, falling, flat,
+from dt_helpers import (breakdown_tape, falling, flat,
                       overrun_pivot_tape, rising)
 from downtrend_bot import indicators as ind
 from downtrend_bot import signals as S
@@ -332,3 +332,24 @@ def test_a_stop_is_always_strictly_on_the_correct_side(buffer_atr, max_stop,
         px = x["c"][x["i"]]
         assert S.build_stop(x, "short", st) > px, (buffer_atr, max_stop, seed)
         assert S.build_stop(x, "long", st) < px, (buffer_atr, max_stop, seed)
+
+
+def test_reward_risk_is_structurally_constant_and_that_is_declared():
+    """The sweep measured `minimum_reward_risk` as INERT (spread 0.000pp). The
+    cause is structural, not a bug: targets are fixed R-multiples of the stop,
+    so a signal's reward/risk IS `tp2_r` and the bar cannot bind below it.
+
+    Pinned so the declaration cannot go stale: if targets ever stop being fixed
+    multiples, this reddens and the comment in `config.py` gets corrected with
+    it."""
+    st = StrategyConfig(tp1_r=1.5, tp2_r=2.5)
+    for seed in range(4):
+        sig, _r = S.evaluate("BTC/USDT:USDT", breakdown_tape(300, level=100.0),
+                             "short", regime=Regime.BEARISH, cfg=st,
+                             symbol_bearish_ok=True, spread_bps=2.0)
+        if sig is None:
+            continue
+        assert sig.reward_risk == pytest.approx(st.tp2_r, rel=1e-6), \
+            "reward/risk is no longer tp2_r by construction -- the INERT " \
+            "declaration in config.py is now wrong"
+        break

@@ -5,7 +5,7 @@ from lighter_bots.config import RegimeConfig
 from lighter_bots.models import Regime
 from lighter_bots.regime import (MarketRegimeEngine, RegimeInputs, breadth,
                                  atr_percentile_now, risk_multiplier)
-from conftest import ramp
+from lb_helpers import ramp
 
 
 def _bull(n=260):
@@ -68,11 +68,16 @@ def test_high_volatility_on_an_extreme_atr_percentile():
 
 
 def test_hysteresis_delays_a_RELAXING_transition():
+    """THE ADVANCE IS THE TEST, SO IT MUST NOT LIVE INSIDE THE ASSERT.
+
+    `assert e.update(inp).regime is ...` advances the engine as a SIDE EFFECT
+    of the assertion -- so under `python -O` the statement is compiled out and
+    the sequence this test is entirely about never happens. It would then pass
+    while testing nothing. Step first, assert second."""
     e = MarketRegimeEngine(RegimeConfig(minimum_confirmation_candles=3))
     inp = RegimeInputs(btc_4h=_bull(), btc_1h=_bull(), breadth_up_frac=0.8)
-    assert e.update(inp).regime is Regime.NEUTRAL, "1 of 3 confirmations"
-    assert e.update(inp).regime is Regime.NEUTRAL, "2 of 3"
-    assert e.update(inp).regime is Regime.BULLISH, "3 of 3"
+    seen = [e.update(inp).regime for _ in range(3)]
+    assert seen == [Regime.NEUTRAL, Regime.NEUTRAL, Regime.BULLISH], seen
 
 
 def test_restrictive_states_arm_IMMEDIATELY():
@@ -83,7 +88,8 @@ def test_restrictive_states_arm_IMMEDIATELY():
     assert e.state is Regime.BULLISH
     panic = RegimeInputs(btc_4h=_bull(), btc_1h=_bull(), breadth_up_frac=0.8,
                          liquidation_burst=True)
-    assert e.update(panic).regime is Regime.PANIC, "no delay on the way IN"
+    armed = e.update(panic).regime
+    assert armed is Regime.PANIC, "no delay on the way IN"
 
 
 def test_leaving_a_restrictive_state_still_needs_confirmations():
@@ -93,9 +99,8 @@ def test_leaving_a_restrictive_state_still_needs_confirmations():
     e.update(panic)
     assert e.state is Regime.PANIC
     calm = RegimeInputs(btc_4h=_bull(), btc_1h=_bull(), breadth_up_frac=0.8)
-    assert e.update(calm).regime is Regime.PANIC
-    assert e.update(calm).regime is Regime.PANIC
-    assert e.update(calm).regime is Regime.BULLISH
+    seen = [e.update(calm).regime for _ in range(3)]
+    assert seen == [Regime.PANIC, Regime.PANIC, Regime.BULLISH], seen
 
 
 def test_transitions_are_recorded():

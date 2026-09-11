@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from conftest import SYMS, tape
+from dt_helpers import SYMS, tape
 from downtrend_bot.backtester import Backtester, Frictions, robustness
 from downtrend_bot.models import Candle, Trade
 from downtrend_bot.synthetic import aggregate, make_market

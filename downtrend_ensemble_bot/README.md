@@ -250,6 +250,27 @@ system usually goes wrong:
 
 ---
 
+## Measured on the shipped synthetic tapes
+
+Reported as what it is: a 166-day generated tape, 6 markets, 40-cell sweep.
+
+| | |
+|---|---|
+| shipped config | 14 trades, +0.60%, maxDD 0.80% — and the **robustness gate REFUSES it** (underpowered at n=14) |
+| `ema_fast` | **SENSITIVE**, 7.17pp spread — the largest in the grid; a value chosen here is a fitted value until it is validated forward |
+| `atr_stop_buffer` · `max_stop_distance_atr` · `minimum_score` · `ema_slow` · `tp1_r` · `tp2_r` · `max_holding_days` | **PLATEAU** — profitable at every swept value, so the result does not turn on the exact setting |
+| `adx_threshold` | **SENSITIVE**, 1.43pp |
+| `ema_mid` · `minimum_reward_risk` | **INERT** — every value produced an identical result |
+
+**The two INERT knobs are declared, not tuned.** `minimum_reward_risk` is inert
+for a structural reason worth knowing: the targets are fixed R-multiples of the
+stop, so reward/risk is `tp2_r` **by construction** and the bar can never bind
+below it. `ema_mid` reached no decision on this tape. Neither is a knob to
+reach for; both are recorded here so the next reader does not spend a day
+discovering it again.
+
+Full output: `docs/run_sensitivity.txt`.
+
 ## Known limitations
 
 * **The only data this repository ships is synthetic.** Every number produced

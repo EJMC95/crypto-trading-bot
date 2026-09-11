@@ -6,7 +6,7 @@ from lighter_bots.lighter_adapter import (AdapterError, CAPABILITIES,
                                           NativeLighterAdapter,
                                           build_capability_report)
 from lighter_bots.models import OrderIntent, OrderRequest
-from conftest import make_market, ramp
+from lb_helpers import make_market, ramp
 
 
 def test_the_report_covers_every_declared_capability():

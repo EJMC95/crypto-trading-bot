@@ -1,0 +1,149 @@
+sweeping 40 cells across 11 parameter(s). Each cell is a FULL backtest.
+  [  1/40] strategy.ema_fast=10: trades=16 ret=-0.0227   (elapsed 0.8m, ~30.9m left)
+  [  2/40] strategy.ema_fast=15: trades=64 ret=7.1465   (elapsed 1.5m, ~28.6m left)
+  [  3/40] strategy.ema_fast=20: trades=14 ret=0.6028   (elapsed 2.2m, ~27.5m left)
+  [  4/40] strategy.ema_fast=30: trades=15 ret=0.7235   (elapsed 2.8m, ~25.6m left)
+  [  5/40] strategy.ema_mid=30: trades=14 ret=0.6028   (elapsed 3.6m, ~24.9m left)
+  [  6/40] strategy.ema_mid=40: trades=14 ret=0.6028   (elapsed 4.3m, ~24.2m left)
+  [  7/40] strategy.ema_mid=50: trades=14 ret=0.6028   (elapsed 5.0m, ~23.5m left)
+  [  8/40] strategy.ema_mid=70: trades=14 ret=0.6028   (elapsed 5.7m, ~22.8m left)
+  [  9/40] strategy.ema_slow=100: trades=15 ret=0.6112   (elapsed 6.4m, ~22.1m left)
+  [ 10/40] strategy.ema_slow=150: trades=15 ret=0.6112   (elapsed 7.1m, ~21.4m left)
+  [ 11/40] strategy.ema_slow=200: trades=14 ret=0.6028   (elapsed 7.8m, ~20.7m left)
+  [ 12/40] strategy.adx_threshold=15.0: trades=14 ret=0.7672   (elapsed 8.6m, ~20.0m left)
+  [ 13/40] strategy.adx_threshold=20.0: trades=14 ret=0.6028   (elapsed 9.3m, ~19.2m left)
+  [ 14/40] strategy.adx_threshold=25.0: trades=12 ret=0.9798   (elapsed 10.0m, ~18.5m left)
+  [ 15/40] strategy.adx_threshold=30.0: trades=7 ret=-0.4543   (elapsed 10.7m, ~17.8m left)
+  [ 16/40] strategy.atr_stop_buffer=0.0: trades=14 ret=0.5416   (elapsed 11.4m, ~17.1m left)
+  [ 17/40] strategy.atr_stop_buffer=0.25: trades=14 ret=0.6028   (elapsed 12.1m, ~16.4m left)
+  [ 18/40] strategy.atr_stop_buffer=0.5: trades=11 ret=1.105   (elapsed 12.9m, ~15.7m left)
+  [ 19/40] strategy.atr_stop_buffer=1.0: trades=57 ret=10.9582   (elapsed 13.5m, ~15.0m left)
+  [ 20/40] strategy.minimum_score=60.0: trades=42 ret=1.9992   (elapsed 14.3m, ~14.3m left)
+  [ 21/40] strategy.minimum_score=65.0: trades=45 ret=3.3906   (elapsed 15.0m, ~13.6m left)
+  [ 22/40] strategy.minimum_score=70.0: trades=14 ret=0.6028   (elapsed 15.8m, ~12.9m left)
+  [ 23/40] strategy.minimum_score=75.0: trades=23 ret=3.0296   (elapsed 16.5m, ~12.2m left)
+  [ 24/40] strategy.minimum_score=80.0: trades=4 ret=0.5436   (elapsed 17.2m, ~11.5m left)
+  [ 25/40] strategy.max_stop_distance_atr=2.0: trades=56 ret=6.5498   (elapsed 17.9m, ~10.7m left)
+  [ 26/40] strategy.max_stop_distance_atr=3.0: trades=14 ret=0.6028   (elapsed 18.7m, ~10.0m left)
+  [ 27/40] strategy.max_stop_distance_atr=4.0: trades=14 ret=0.5679   (elapsed 19.4m, ~9.3m left)
+  [ 28/40] strategy.tp1_r=1.0: trades=15 ret=0.1966   (elapsed 20.1m, ~8.6m left)
+  [ 29/40] strategy.tp1_r=1.5: trades=14 ret=0.6028   (elapsed 20.9m, ~7.9m left)
+  [ 30/40] strategy.tp1_r=2.0: trades=14 ret=0.6863   (elapsed 21.6m, ~7.2m left)
+  [ 31/40] strategy.tp2_r=2.0: trades=14 ret=0.6246   (elapsed 22.3m, ~6.5m left)
+  [ 32/40] strategy.tp2_r=2.5: trades=14 ret=0.6028   (elapsed 23.0m, ~5.8m left)
+  [ 33/40] strategy.tp2_r=3.5: trades=12 ret=1.0135   (elapsed 23.8m, ~5.0m left)
+  [ 34/40] strategy.max_holding_days=2.0: trades=14 ret=0.4997   (elapsed 24.5m, ~4.3m left)
+  [ 35/40] strategy.max_holding_days=5.0: trades=14 ret=0.6028   (elapsed 25.2m, ~3.6m left)
+  [ 36/40] strategy.max_holding_days=10.0: trades=14 ret=0.6028   (elapsed 25.9m, ~2.9m left)
+  [ 37/40] strategy.minimum_reward_risk=1.4: trades=14 ret=0.6028   (elapsed 26.6m, ~2.2m left)
+  [ 38/40] strategy.minimum_reward_risk=1.8: trades=14 ret=0.6028   (elapsed 27.3m, ~1.4m left)
+  [ 39/40] strategy.minimum_reward_risk=2.2: trades=14 ret=0.6028   (elapsed 28.0m, ~0.7m left)
+------------------------------------------------------------------------------
+SENSITIVITY SWEEP (one parameter at a time)
+------------------------------------------------------------------------------
+  shipped config: trades 14   return 0.60%   maxDD 0.80%   robustness REFUSED
+    - only 14 trades (< 30): underpowered
+    - BNB/USDT:USDT carries 74% of P&L (> 60%): one-market result
+    - top 3 trades are 178% of profit (> 80%): tail-dependent
+    - halves disagree (h1 +104.45 / h2 -44.17): unstable across time
+
+  strategy.ema_fast   [SENSITIVE]  spread 7.169pp
+    the sign flips inside the swept range; a value chosen here is a fitted value until it is validated forward
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  10     16      -0.02    0.91    0.139  REFUSED       
+  15     64      7.15     0.90    0.838  PASS          
+  20     14      0.60     0.80    0.301  REFUSED       
+  30     15      0.72     0.84    0.266  REFUSED       
+
+  strategy.ema_mid   [INERT]  spread 0.000pp
+    every value produced an identical result -- this knob does not reach a decision on this tape
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  30     14      0.60     0.80    0.301  REFUSED       
+  40     14      0.60     0.80    0.301  REFUSED       
+  50     14      0.60     0.80    0.301  REFUSED       
+  70     14      0.60     0.80    0.301  REFUSED       
+
+  strategy.ema_slow   [PLATEAU]  spread 0.008pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  100    15      0.61     0.79    0.298  REFUSED       
+  150    15      0.61     0.79    0.298  REFUSED       
+  200    14      0.60     0.80    0.301  REFUSED       
+
+  strategy.adx_threshold   [SENSITIVE]  spread 1.434pp
+    the sign flips inside the swept range; a value chosen here is a fitted value until it is validated forward
+  value  trades  return%  maxDD%  avgR    robust   error
+  -----  ------  -------  ------  ------  -------  -----
+  15.0   14      0.77     0.64    0.312   REFUSED       
+  20.0   14      0.60     0.80    0.301   REFUSED       
+  25.0   12      0.98     0.74    0.430   REFUSED       
+  30.0   7       -0.45    0.74    -0.185  REFUSED       
+
+  strategy.atr_stop_buffer   [PLATEAU]  spread 10.417pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  0.0    14      0.54     0.92    0.345  REFUSED       
+  0.25   14      0.60     0.80    0.301  REFUSED       
+  0.5    11      1.10     0.93    0.746  REFUSED       
+  1.0    57      10.96    0.68    1.310  PASS          
+
+  strategy.minimum_score   [PLATEAU]  spread 2.847pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  60.0   42      2.00     0.70    0.370  REFUSED       
+  65.0   45      3.39     0.63    0.693  PASS          
+  70.0   14      0.60     0.80    0.301  REFUSED       
+  75.0   23      3.03     0.59    1.072  REFUSED       
+  80.0   4       0.54     0.26    0.700  REFUSED       
+
+  strategy.max_stop_distance_atr   [PLATEAU]  spread 5.982pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  2.0    56      6.55     0.88    0.853  PASS          
+  3.0    14      0.60     0.80    0.301  REFUSED       
+  4.0    14      0.57     0.78    0.290  REFUSED       
+
+  strategy.tp1_r   [PLATEAU]  spread 0.490pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  1.0    15      0.20     0.85    0.101  REFUSED       
+  1.5    14      0.60     0.80    0.301  REFUSED       
+  2.0    14      0.69     0.64    0.474  REFUSED       
+
+  strategy.tp2_r   [PLATEAU]  spread 0.411pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  2.0    14      0.62     0.80    0.390  REFUSED       
+  2.5    14      0.60     0.80    0.301  REFUSED       
+  3.5    12      1.01     0.74    0.598  REFUSED       
+
+  strategy.max_holding_days   [PLATEAU]  spread 0.103pp
+    profitable at every swept value -- the result does not depend on this knob's exact setting
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  2.0    14      0.50     0.80    0.258  REFUSED       
+  5.0    14      0.60     0.80    0.301  REFUSED       
+  10.0   14      0.60     0.80    0.301  REFUSED       
+
+  strategy.minimum_reward_risk   [INERT]  spread 0.000pp
+    every value produced an identical result -- this knob does not reach a decision on this tape
+  value  trades  return%  maxDD%  avgR   robust   error
+  -----  ------  -------  ------  -----  -------  -----
+  1.4    14      0.60     0.80    0.301  REFUSED       
+  1.8    14      0.60     0.80    0.301  REFUSED       
+  2.2    14      0.60     0.80    0.301  REFUSED       
+
+  INERT PARAMETERS (declared, not tuned):
+    - strategy.ema_mid
+    - strategy.minimum_reward_risk
+
+  no 'best' cell is reported, on purpose: selecting the best of N cells inflates its statistic by roughly the spread of the unselected ones. Read the SHAPE. An INERT parameter is a knob that reached no decision on this tape -- declare it, do not tune it.
+------------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from conftest import SYMS, tape
+from dt_helpers import SYMS, tape
 from downtrend_bot.config import Mode
 from downtrend_bot.exchange_adapter import MockExchange, NotSupported
 from downtrend_bot.health import (StrategyHealthMonitor, kill_switch_path)

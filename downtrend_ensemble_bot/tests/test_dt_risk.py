@@ -1,7 +1,7 @@
 """Sizing, caps, lockouts, and the arithmetic that must never round the wrong way."""
 import pytest
 
-from conftest import SYMS
+from dt_helpers import SYMS
 from downtrend_bot.config import ExecutionConfig, RiskConfig, StrategyConfig
 from downtrend_bot.models import Regime, ScoreCard, Signal
 from downtrend_bot.risk import (Account, Exposure, correlation_multiplier,

@@ -5,7 +5,7 @@ from lighter_bots import signals as S
 from lighter_bots.backtester import Backtester, Frictions
 from lighter_bots.config import AppConfig
 from lighter_bots.models import Candle
-from conftest import ramp
+from lb_helpers import ramp
 
 
 def _cfg(tmp_path):
@@ -78,7 +78,7 @@ def test_a_spike_planted_in_the_FUTURE_changes_nothing(tmp_path):
 
 
 def _reg():
-    from conftest import make_market
+    from lb_helpers import make_market
     from lighter_bots.market_metadata import MarketRegistry
     return MarketRegistry([
         make_market("BTC", 1, tick_size=0.001, qty_step=0.0001,
@@ -254,7 +254,14 @@ def test_a_backtest_never_mutates_operational_state(tmp_path):
     res = bt.run(_tapes(420), "BTC")
     assert res.bars > 0
 
-    assert json.load(open(health_path)) == sentinel, \
+    # Read OUTSIDE the assert. `assert json.load(open(p)) == x` leaks the
+    # handle and, under `python -O`, the whole statement -- including the read
+    # -- is compiled out, so the check silently stops happening.
+    with open(health_path) as fh:
+        health_after = json.load(fh)
+    with open(budget_path) as fh:
+        budget_after = json.load(fh)
+    assert health_after == sentinel, \
         "the backtest overwrote live strategy health"
-    assert "keep-me" in json.load(open(budget_path))["seen_signal_ids"], \
+    assert "keep-me" in budget_after["seen_signal_ids"], \
         "the backtest overwrote the live trade budget"

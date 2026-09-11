@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from conftest import SYMS, tape
+from dt_helpers import SYMS, tape
 from downtrend_bot.backtester import Frictions
 from downtrend_bot.walk_forward import (_set, _shape, default_grid,
                                         sensitivity, walk_forward)
