@@ -594,3 +594,50 @@ def test_the_live_gate_sees_a_capable_adapter_as_capable(cfg):
                                  "LIVE_CONFIRMATION": "I_UNDERSTAND_THE_RISK"})
     assert detail["protective_capability"] is True
     assert res.checks["protective_exit_capability"] is True
+
+
+def test_paper_fills_are_never_kinder_than_the_backtest(cfg):
+    """The soak GATES live trading, so it must not be a softer test than the
+    backtest it validates.
+
+    The first version filled at the exact limit price and charged no entry
+    fee, while the backtester charged spread, slippage and both fees -- so a
+    book could look gradeable on paper and not be. This asserts the direction
+    on both sides rather than the exact number: a long pays MORE than the
+    quoted price, a short receives LESS."""
+    t = trader(cfg)
+    long_fill = t._adverse(100.0, "long", closing=False)
+    short_fill = t._adverse(100.0, "short", closing=False)
+    assert long_fill > 100.0, "a paper long filled at or better than the quote"
+    assert short_fill < 100.0, "a paper short filled at or better than the quote"
+    # closing reverses which direction hurts
+    assert t._adverse(100.0, "long", closing=True) < 100.0
+    assert t._adverse(100.0, "short", closing=True) > 100.0
+
+
+def test_a_paper_round_trip_charges_both_legs(cfg):
+    """Charging only the exit understates the round trip by half, and a paper
+    book is graded on round trips."""
+    t = trader(cfg)
+    pos = Position(symbol=SYMS[0], side="short", quantity=1.0,
+                   entry_price=100.0, opened_ts=t.clock() - 60,
+                   stop_price=103.0, r_unit=3.0, protective_ok=True)
+    t.book.positions[pos.symbol] = pos
+    t._close(pos, 100.0, "manual")
+    tr = t.book.closed[-1]
+    one_leg = 100.0 * cfg.execution.taker_fee
+    assert tr.fees > one_leg * 1.9, f"only one leg was charged: {tr.fees}"
+
+
+def test_a_flat_paper_round_trip_loses_money(cfg):
+    """The sanity check the frictions exist for: open and close at the same
+    mark and the book must be DOWN. A paper book that breaks even on a flat
+    round trip is a book whose costs are not wired in."""
+    t = trader(cfg)
+    before = t.equity
+    pos = Position(symbol=SYMS[0], side="short", quantity=1.0,
+                   entry_price=100.0, opened_ts=t.clock() - 60,
+                   stop_price=103.0, r_unit=3.0, protective_ok=True)
+    t.book.positions[pos.symbol] = pos
+    t._close(pos, 100.0, "manual")
+    assert t.equity < before, "a flat round trip cost nothing"

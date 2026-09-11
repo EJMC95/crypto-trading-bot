@@ -581,8 +581,23 @@ class Trader:
         pos.stop_price = old
         return False
 
+    def _adverse(self, price: float, side: str, *, closing: bool) -> float:
+        """Move a fill AGAINST us by the configured slippage.
+
+        PAPER MUST NOT BE KINDER THAN THE BACKTEST. The first version filled at
+        the exact limit price and charged no entry fee, while the backtester
+        charged spread, slippage and both fees -- so the 30-day soak, which is
+        the thing that GATES LIVE TRADING, was a softer test than the backtest
+        it validates. A gate more permissive than its own evidence is
+        backwards, and it fails in the expensive direction: a book looks
+        gradeable on paper and is not."""
+        bps = self.cfg.backtest.slippage_bps + self.cfg.backtest.spread_bps / 2.0
+        adj = price * bps / 10_000.0
+        worse_up = (side == "long") if not closing else (side == "short")
+        return price + adj if worse_up else price - adj
+
     def _paper_fill(self, req: OrderRequest) -> OrderResult:
-        px = req.price or 0.0
+        px = self._adverse(req.price or 0.0, req.side, closing=False)
         return OrderResult(accepted=True, order_id=req.client_order_id,
                            status="filled", filled=req.quantity,
                            avg_price=px, submitted=False)
@@ -608,10 +623,13 @@ class Trader:
                 log.error("FAILED TO CLOSE %s: %s", pos.symbol, exc)
                 return
         else:
-            px = mark
+            px = self._adverse(mark, pos.side, closing=True)
         sgn = 1.0 if pos.side == "long" else -1.0
         pnl = sgn * (px - pos.entry_price) * pos.quantity
-        fee = abs(px * pos.quantity) * self.cfg.execution.taker_fee
+        # BOTH legs. Charging only the exit understates the round trip by
+        # half, and a paper book is graded on round trips.
+        fee = (abs(px * pos.quantity) + abs(pos.entry_price * pos.quantity)) \
+            * self.cfg.execution.taker_fee
         pnl -= fee
         trade = Trade(symbol=pos.symbol, side=pos.side, strategy=pos.strategy,
                       setup=str(pos.meta.get("setup", "")),

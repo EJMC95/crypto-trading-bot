@@ -46,7 +46,12 @@ check for you.
    notifications by design (spec 16) — the terminal dashboard is the whole
    monitoring surface.
 
-**What the paper soak cannot tell you.** Paper fills a limit order on a touch;
+**Paper charges the backtest's frictions.** A paper fill moves against you by
+`slippage_bps + spread_bps/2` and a round trip pays the taker fee on BOTH legs
+— because the soak is what gates live trading, and a gate softer than the
+backtest it validates fails in the expensive direction.
+
+**What the paper soak still cannot tell you.** Paper fills a limit order on a touch;
 a real one may sit behind a queue and never fill. It does not simulate venue
 downtime, rate limits, rejected signed payloads, funding settled at the mark,
 or a partial fill beyond the configured rate. **Every one of those makes paper
