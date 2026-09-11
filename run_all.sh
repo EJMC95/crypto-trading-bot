@@ -420,6 +420,22 @@ done &
     sleep "${RADAR_INTERVAL_SEC:-1800}"
   done ) &
 
+# [2026-09-11 (abk)] 🔭 THE ENTRY-CELL OBSERVER — publish-only instrument.
+# Answers the two questions a book's own scan census structurally cannot: did
+# the entry cell open somewhere OUTSIDE the names this book scans, and how long
+# does an opening LAST. Its own loop, because a WARM CandleCache is the whole
+# point: one candle fetch per (coin, tf) per closed candle, under a per-cycle
+# NEW-fetch budget, so the venue-wide sweep costs what the candle clock demands
+# rather than N fetches every cycle. A one-shot-per-cycle form (the radar shape
+# above) would refetch the venue from cold every time — the expensive way to
+# learn less.
+#
+# It places no order (read-only venue client, no signer), writes no lever and
+# takes no dashboard row. Boot stagger keeps it behind the organs that publish
+# the keys it reads.
+( sleep 95
+  python3 /freqtrade/entry_cell_observer.py --publish --loop || true ) &
+
 # [2026-07-30 GO-LIVE GRADER] 🚦 grades every living book against the (fk)
 # go-live bar (>=30d, >=30 closes, mean>0, t>=2.0, both halves +, maxDD<15%)
 # -> bot_state 'golive-readiness', which the dashboard renders. The rule that

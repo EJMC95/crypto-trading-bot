@@ -66,6 +66,13 @@ UNPAGEABLE_OK = {
     #                        proposal is replay-gated by the tuner anyway.
     # Either leaves this set the day an actuator consumes it fail-OPEN.
     "coin-quality", "tuning-proposals",
+    # [2026-09-11 (abk)] 🔭 entry-cell-observer — PUBLISH-ONLY instrument, no
+    # consumer, no actuator, no row of its own (I22). Its darkness removes no
+    # rail and changes no trade: every book keeps scanning and entering exactly
+    # as before. What a dark reading costs is the ANSWER to "is this book
+    # starved by its list or by a gate" — visible on its own vitals card. It
+    # leaves this set the day an actuator consumes it, like the rest.
+    "entry-cell-observer",
 }
 
 

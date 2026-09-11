@@ -466,6 +466,15 @@ SELFTEST_MODULES = [
     "fleet_radar",
     "fleet_allocation",
     "fleet_bus",
+    # [2026-09-11 (abk)] 🔭 the entry-cell observer. Its selftest IS the
+    # instrument's calibration: the dwell bookkeeping (an uncovered coin
+    # CARRIES rather than closing, the bucket is stamped at the OPEN, both
+    # retention caps), the three-way opening split, and the two ways it could
+    # lie quietly — a dark venue list reading as "missed nothing" and a broken
+    # gate check reading as "actionable". 16 of 16 mutations redden it, with a
+    # positive control that survives so the harness is known to be able to
+    # report a survival.
+    "entry_cell_observer",
     "fleet_clock",
     "fleet_immune",
     "fleet_proposals",

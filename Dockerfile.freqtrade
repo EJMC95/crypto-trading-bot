@@ -102,6 +102,9 @@ COPY implementation_shortfall.py /freqtrade/implementation_shortfall.py
 COPY fleet_radar.py /freqtrade/fleet_radar.py
 # [2026-08-01 (hv)] the allocation organ — publish-only; see fleet_allocation.py
 COPY fleet_allocation.py /freqtrade/fleet_allocation.py
+# [2026-09-11 (abk)] 🔭 the entry-cell observer — publish-only; it imports
+# lighter_family_bot (already COPY'd below) to call the books' OWN signals().
+COPY entry_cell_observer.py /freqtrade/entry_cell_observer.py
 # [2026-07-30] 🚦 the GO-LIVE GRADER becomes an organ. It implements the (fk)
 # bar — the ONE rule that decides whether a shadow book may ever hold real
 # money — and until now it shipped in no image and ran on no schedule, so its

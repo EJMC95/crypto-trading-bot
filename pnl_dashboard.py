@@ -5661,6 +5661,12 @@ ORGAN_SPECS = [
     # publishing healthily with NO surface serving it and NO roster entry, so
     # it could go dark unseen — both halves of the (hw)/I13 class at once.
     ("fleet-allocation",   "💰 Allocation — capital vs measured claims", False, 5400),
+    # [2026-09-11 (abk)] 🔭 the entry-cell observer. TTL is 3x its own
+    # 300s loop, the DARK convention. Non-critical and DECLARED in
+    # `UNPAGEABLE_OK`: it is an instrument, nothing consumes it, and a
+    # dark reading removes no rail — but it gets a card, because an
+    # organ with no vitals row is invisible rather than merely quiet.
+    ("entry-cell-observer", "🔭 Entry cell — openings, dwell, unseen", False, 900),
     # [2026-07-30] go-live grader — the (fk) bar, now an organ on a 6-hourly
     # loop. Staleness matters here for a specific reason: this is the ONLY
     # published view of how close a book is to holding real money, so a dark
