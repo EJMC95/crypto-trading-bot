@@ -156,6 +156,31 @@ convention on both arms, declared rather than discovered.
   (`lighter_ticket_replay`), not a label join — named as the next instrument,
   not as a result.
 
+**AND THE REAL ANSWER TO "WIDEN UNTIL YOU FIND AN EDGE" IS THAT WIDTH WAS
+NEVER THE BINDING CONSTRAINT — THE SAMPLE IS.** The sibling sweep's
+verification decomposed its own detection floor on the control cell (n=110,
+sd_d 6.281pp, G=39) and the arithmetic settles it:
+
+| bar | mde80 | multiplier |
+|---|---|---|
+| a SINGLE pre-registered hypothesis, iid | **1.69pp/trade** | — |
+| + day clustering | 1.88pp | x1.11 |
+| + BH across 153 cells | 3.38pp | x1.80 |
+
+**The book's entire mean is 1.38pp/trade, so the FIRST bar already exceeds it —
+before any multiplicity at all.** The measured price of the whole width is only
+**2.0x**. So "widening destroys the power" is half wrong and is corrected here:
+testing ONE hypothesis on this ledger could not resolve an effect the size of
+the book's own mean. **No search design fixes that; only more closes do** —
+which is exactly why the offered set (n=2,736, mde80 **0.30pp**) was the right
+population to ask, and it is the one that came back empty with adequate power
+to see an answer.
+
+Same verification also measured the test as **CONSERVATIVE, not permissive**:
+over 200 held-out null books, P(p<=0.05) = **2.19% +/- 0.38%** against a
+nominal 5%, and family-wise error 0.5% against a nominal 5%. The refusal is if
+anything understated.
+
 **WHAT THE SEARCH CAN AND CANNOT SAY.** Every cell prints its own **mde80**,
 so a null reads *"could not have detected an edge below X"* rather than *"no
 edge"* — for the big breakout cells that floor is ~0.5%/trade, for the thin
