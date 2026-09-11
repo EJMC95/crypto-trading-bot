@@ -134,6 +134,7 @@ jobs:
           # which is exactly the vacuous green the guard test pins against
           fetch-depth: 0
       - name: Fetch the public feed
+        id: feed
         run: |
           set -euo pipefail
           curl -sS --retry 3 --retry-delay 5 "$FEED" -o pnl.json
@@ -151,6 +152,18 @@ jobs:
       # goes red. Fail-closed by construction — an unreadable feed makes no
       # claim rather than passing.
       - name: Does the declared live roster still match the live feed?
+        # [2026-09-11 (aaz)] GATED ON THE FEED, NOT ON THE GUARD ABOVE. Steps
+        # abort the job at the first failure, so for three consecutive
+        # scheduled weeks (16-Aug 31979750293, 23-Aug 32674318505, 31-Aug
+        # 33347486090) `audit_code_currency` went red — correctly, naming a
+        # BEHIND-OWN container — and THIS guard and the one below it never
+        # executed at all. A stale container silently bought three weeks of
+        # blindness in the two checks placed here to catch a different class.
+        # The condition is the FEED's outcome, never `always()`: a dark feed
+        # must still skip this (the job treats that as failure by design), and
+        # `continue-on-error` is refused because it would mask the exit code
+        # that `test_code_currency_exit_code_is_not_masked` pins.
+        if: ${{ !cancelled() && steps.feed.outcome == 'success' }}
         run: python3 scripts/audit_live_roster.py --pnl-json pnl.json
 
       # [2026-08-16 (pb)] CI COVERAGE — the two workflows disagree about a
@@ -169,6 +182,10 @@ jobs:
       # ungraded is reported and passes, because a guard that reddens on the
       # benign case is one the reader learns to ignore ((gl)).
       - name: Was the deployed code ever graded?
+        # [2026-09-11 (aaz)] Reads git history + `gh run list` and touches the
+        # feed not at all, so it is gated only on not-cancelled — see the note
+        # on the roster step above for the three weeks this silence cost.
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/audit_ci_coverage.py --depth 60 --gha
