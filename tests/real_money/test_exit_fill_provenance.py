@@ -68,12 +68,32 @@ def test_the_decision_price_fallback_still_exists():
 
 def test_the_grading_consumer_reads_the_ledger_not_the_order_table():
     """The reason the stamp has to ride the CLOSE row. If golive_readiness ever
-    joins venue_orders, the flag could live there instead."""
-    gr = (_ROOT / "scripts/golive_readiness.py").read_text()
-    assert "fetch_paper_trades" in gr
-    assert "venue_orders" not in gr, (
-        "the grader now reads venue_orders — re-check whether the close-row "
-        "stamp is still the only path to a measured flag")
+    joins venue_orders, the flag could live there instead.
+
+    [2026-09-11 (abe)] ASSERTED ON STRING LITERALS, NOT ON THE PAGE. This was a
+    substring scan of the whole file, and it failed on a COMMENT that merely
+    NAMES the table as evidence — `(abe)` cites `venue_orders` in
+    `NON_BOT_FLOWS`' docs as one of the three lines that dated an operator's
+    manual trades, while the grader still never queries it. That is this repo's
+    own documented trap ("a page-wide substring scan is not a structural
+    claim": `dry_run` appears in "flips no dry_run", `era` appears in
+    "operator"), and the remedy it names is the AST.
+
+    A real read would have to NAME the table in a query — i.e. in a string
+    constant — so that is what is checked. Comments are not in the AST at all,
+    so the property is now about what the code DOES rather than about which
+    words appear near it.
+    """
+    src = (_ROOT / "scripts/golive_readiness.py").read_text()
+    assert "fetch_paper_trades" in src
+    tree = ast.parse(src)
+    named = [n for n in ast.walk(tree)
+             if isinstance(n, ast.Constant) and isinstance(n.value, str)
+             and "venue_orders" in n.value]
+    assert not named, (
+        "the grader now names venue_orders in a string constant (line "
+        f"{named[0].lineno}) — re-check whether the close-row stamp is still "
+        "the only path to a measured flag")
 
 
 # --------------------------------------------------------------------------
