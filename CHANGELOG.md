@@ -1,3 +1,73 @@
+## 2026-09-11 (aaz) — A RED GUARD STILL SILENCES THE TWO BEHIND IT, AND THE MARKER GUARD'S OWN REMEDIATION WAS UNREACHABLE
+
+**[RENUMBERED (aau) -> (aav) -> (aaw) -> (aaz), 2026-09-11 — THREE MOVES, AND
+THE THIRD ONE IS THE FINDING.** `(aau)` and `(aaw)` were each taken by a
+concurrent session and MERGED to main while this entry was being written;
+`(aav)` was taken on an open branch by **PR #306**, another session's
+near-duplicate salvage of this same PR #293. All three were caught — twice on
+CI — by the cross-branch and open-branch arms shipped in `(zw)` the night
+before, on their first real races, and each fix was one `--next` away.
+**THE GAP THAT REMAINS, recorded rather than patched:** `--next` is a READ with
+no RESERVATION, so two sessions asking in the same minute get the same answer —
+which is exactly how #306 and this entry both landed on `(aaw)`. A cross-machine
+lock is not available and is not the fix; the fix is to stop two sessions
+duplicating one salvage. **The duplication is the house, the letter is the
+smoke** — and a guard that says so three times in one hour is working.**
+
+**Salvaged from PR #293, whose real-money limb is superseded and whose CI limb
+never landed.** #293 carried two things: 🙏 avo's volume floor `0.5 -> 0.25`
+and a pair of workflow fixes. `(aae)` has since re-derived that floor from her
+own clip ratio to **0.15** — wider, better argued — so merging #293 would have
+**narrowed a live book from 0.15 back to 0.25**, a step backward on real money
+shipped under a title about CI. The floor limb is dropped and #293 closed; the
+CI limb is here, rebased onto main and re-verified, because main has **neither
+fix** and both defects are live today.
+
+**① A RED STEP STILL ABORTS THE TWO GUARDS BEHIND IT.** Steps abort the job at
+the first failure, so for three consecutive scheduled weeks — 16-Aug
+`31979750293`, 23-Aug `32674318505`, 31-Aug `33347486090` — `audit_code_currency`
+went red, **correctly**, naming a BEHIND-OWN container, and
+`audit_live_roster` and `audit_ci_coverage` never executed at all. A stale
+container bought **three weeks of blindness** in two checks placed there to
+catch an entirely different class. The roster guard is now gated on the FEED's
+own outcome (`steps.feed.outcome == 'success'`), never on `always()` — a dark
+feed must still skip it, because this job treats a dark feed as failure BY
+DESIGN — and the ci-coverage guard, which reads git history and `gh run list`
+and touches the feed not at all, on `!cancelled()`. `continue-on-error` is
+refused: it would mask the exit code `test_code_currency_exit_code_is_not_masked`
+pins, and a guard whose only output is a warning on a passing run is not a
+guard ((gl)/(hj)).
+
+**② THE MARKER GUARD'S OWN FIX COULD NOT CLEAR IT — and this half was
+UNGUARDED, which is why it is the half this entry adds.** `(xh)` made the PULL
+REQUEST TITLE the field that decides whether real money deploys, and
+`audit_live_marker_survives_squash` reads that title. GitHub's default
+`pull_request` activity types are opened/synchronize/reopened — **`edited` is
+not among them** — so a PR rejected *for its title* could never re-run the
+check by fixing that title. Measured on PR #291: red at 12:46Z asking for the
+marker in the title, title corrected three minutes later, **check stayed red**
+with no way to clear it short of an empty push, which `(hj)`/`(gl)` forbid as a
+way to kick CI. #293 added `edited` to the trigger and shipped **no test for
+it**; `reruns_on_title_edit` now pins the property inside the guard whose
+remediation depends on it — ONE owner, read from the workflow rather than
+retyped, and `None` (no claim) when there is no checkout to read, the
+`workflow_markers` fail-open precedent beside it.
+
+**MUTATIONS, 5 of 5 red, each against a green control:** drop either `if:` ->
+`test_a_red_guard_never_silences_the_guards_behind_it`; blind the step parser
+-> `test_the_step_parser_can_actually_see_a_step` (the (po) positive control —
+a line parser that matches nothing reports clean); drop `edited` from the
+trigger, **and** delete the `types:` line entirely so GitHub's defaults apply
+-> the new selftest arm. The second of those matters: omitting `types:` is
+byte-identical in effect to excluding `edited` and looks innocent in a diff.
+
+**WHAT THIS DOES NOT CARRY, stated so nobody re-mines #293 for it:** the avo
+floor value, its tests, and its `session_state` carried row are all superseded
+by `(aae)` — main's `test_no_family_floor_sits_at_or_below_the_measured_slippage_cliff`
+already pins the same durable property at the same measured `(qq)` cliff, and
+its derivation is better. #293's letters `(ze)`/`(zh)` are abandoned with it:
+`(zh)` had already been renumbered once off `(zg)` and collided a second time
+with a merged entry, and `(ze)` was held simultaneously by open PR #294.
 ## 2026-09-11 (aba) — THE FIVE ROUTINES THAT REVIEW THIS FLEET WERE THE ONE THING IT DID NOT INSTRUMENT: HALF THEIR DAYS ARE MISSING, AND NOTHING NOTICED
 
 **Eamon, 11-Sep:** *"improve crypto research review, daily evidence review,

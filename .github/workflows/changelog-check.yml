@@ -13,6 +13,16 @@ name: Changelog check
 on:
   pull_request:
     branches: [main]
+    # [2026-09-11 (aaz)] `edited` is LOAD-BEARING, not tidiness. The default
+    # types are opened/synchronize/reopened, so a PR whose TITLE is the thing
+    # a check reads could never re-run that check by fixing the title —
+    # `live-marker-survives-squash` compares the PULL REQUEST TITLE against the
+    # branch's commit subjects, and (xh) made the title the field that decides
+    # whether real money deploys. Measured on PR #291: the guard went red at
+    # 12:46Z asking for the marker in the title, the title was corrected three
+    # minutes later, and the check stayed red with no way to clear it short of
+    # an empty push — which (hj)/(gl) forbid as a way to kick CI.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
