@@ -3,7 +3,7 @@ import pytest
 
 from lighter_bots import execution as ex
 from lighter_bots.config import ExecutionConfig
-from lighter_bots.models import (OrderIntent, RiskDecision, ScoreBreakdown,
+from lighter_bots.models import (RiskDecision, ScoreBreakdown,
                                  Signal)
 from lighter_bots.lighter_adapter import build_capability_report
 

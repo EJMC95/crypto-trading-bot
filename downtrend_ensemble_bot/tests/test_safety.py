@@ -3,6 +3,8 @@ import os
 
 import pytest
 
+from dt_helpers import read_text
+
 from downtrend_bot import config as C
 from downtrend_bot.config import (LIVE_CONFIRMATION_PHRASE, AppConfig, LiveGate,
                                   Mode, _GATE_ENV_KEYS, flatten_confirmed,
@@ -164,7 +166,7 @@ def test_no_credential_is_ever_written_into_a_config_file():
                            r"['\"]?[A-Za-z0-9_\-/+]{12,}")
     for path in glob.glob(os.path.join(os.path.dirname(__file__), "..",
                                        "config", "*.yaml")):
-        body = open(path).read()
+        body = read_text(path)
         assert not secretish.search(body), f"{path} looks like it holds a key"
 
 
@@ -178,7 +180,7 @@ def test_secrets_never_reach_the_logs():
     import json
     import logging
 
-    from downtrend_bot.logging_setup import JsonFormatter, scrub
+    from downtrend_bot.logging_setup import JsonFormatter
 
     key = "0x" + "a" * 64
     rec = logging.LogRecord("downtrend_bot.t", logging.INFO, __file__, 1,
@@ -232,7 +234,7 @@ def test_the_declared_dependencies_are_the_ones_actually_imported():
 
     root = os.path.join(os.path.dirname(__file__), "..")
     declared = set()
-    body = open(os.path.join(root, "pyproject.toml")).read()
+    body = read_text(os.path.join(root, "pyproject.toml"))
     m = re.search(r"^dependencies = \[(.*?)\]", body, re.S | re.M)
     assert m, "no dependencies list in pyproject.toml"
     for tok in re.findall(r'"([A-Za-z0-9_.\-]+)', m.group(1)):
@@ -242,7 +244,7 @@ def test_the_declared_dependencies_are_the_ones_actually_imported():
     stdlib = set(getattr(__import__("sys"), "stdlib_module_names", ()))
     local = {"downtrend_bot", "conftest"}
     for path in glob.glob(os.path.join(root, "src", "downtrend_bot", "*.py")):
-        tree = ast.parse(open(path).read())
+        tree = ast.parse(read_text(path))
         for node in ast.walk(tree):
             mods = []
             if isinstance(node, ast.Import):
@@ -265,7 +267,7 @@ def test_the_declared_dependencies_are_the_ones_actually_imported():
     for mod in ("ccxt", "bot_pnl_store"):
         for path in glob.glob(os.path.join(root, "src", "downtrend_bot",
                                            "*.py")):
-            body = open(path).read()
+            body = read_text(path)
             if _re.search(rf"^\s*import {mod}\b", body, _re.M):
                 assert _re.search(rf"try:.*?^\s*import {mod}\b", body,
                                   _re.M | _re.S), \

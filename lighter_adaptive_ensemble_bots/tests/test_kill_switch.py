@@ -6,7 +6,7 @@ import pytest
 from lighter_bots import health as H
 from lighter_bots.config import AppConfig, LiveGate, flatten_confirmed
 from lighter_bots.models import Regime
-from lb_helpers import ramp
+from lb_helpers import ramp, write_text
 
 ENV_OK = {
     "ENABLE_LIVE_TRADING": "true",
@@ -32,13 +32,13 @@ def _cfg(tmp_path):
 def test_kill_switch_is_detected_by_presence(tmp_path):
     c = _cfg(tmp_path)
     assert not H.kill_switch_active(c.runtime_dir)
-    open(H.kill_switch_path(c.runtime_dir), "w").write("halt")
+    write_text(H.kill_switch_path(c.runtime_dir), "halt")
     assert H.kill_switch_active(c.runtime_dir)
 
 
 def test_the_example_file_does_not_arm_the_switch(tmp_path):
     c = _cfg(tmp_path)
-    open(os.path.join(c.runtime_dir, "KILL_SWITCH.example"), "w").write("x")
+    write_text(os.path.join(c.runtime_dir, "KILL_SWITCH.example"), "x")
     assert not H.kill_switch_active(c.runtime_dir), \
         "the shipped .example must never halt a system by existing"
 
@@ -74,7 +74,7 @@ def test_each_preflight_condition_closes_the_gate(tmp_path, flag):
 
 def test_the_kill_switch_closes_the_gate(tmp_path):
     c = _cfg(tmp_path)
-    open(H.kill_switch_path(c.runtime_dir), "w").write("halt")
+    write_text(H.kill_switch_path(c.runtime_dir), "halt")
     g = LiveGate(c, env=dict(ENV_OK)).evaluate(**ALL_OK)
     assert not g.allowed and "no_kill_switch" in g.blockers
 

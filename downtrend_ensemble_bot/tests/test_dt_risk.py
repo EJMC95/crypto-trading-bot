@@ -2,7 +2,7 @@
 import pytest
 
 from dt_helpers import SYMS
-from downtrend_bot.config import ExecutionConfig, RiskConfig, StrategyConfig
+from downtrend_bot.config import ExecutionConfig, RiskConfig
 from downtrend_bot.models import Regime, ScoreCard, Signal
 from downtrend_bot.risk import (Account, Exposure, correlation_multiplier,
                                 liquidity_multiplier, round_step, round_tick,

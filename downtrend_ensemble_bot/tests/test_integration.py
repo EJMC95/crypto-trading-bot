@@ -1,16 +1,12 @@
 """Section 30, end to end: the behaviours only the whole loop can demonstrate."""
-import json
-import os
-import time
 
 import pytest
 
 from dt_helpers import SYMS, tape
-from downtrend_bot.config import Mode
 from downtrend_bot.exchange_adapter import MockExchange, NotSupported
 from downtrend_bot.health import (StrategyHealthMonitor, kill_switch_path)
 from downtrend_bot.models import Candle, Position, Regime, Trade
-from downtrend_bot.portfolio import Book, TradeBudget, effective_bets
+from downtrend_bot.portfolio import TradeBudget, effective_bets
 from downtrend_bot.store import Store, reconcile
 from downtrend_bot.synthetic import make_market
 from downtrend_bot.trader import Trader
@@ -462,7 +458,6 @@ def test_the_real_exchange_adapter_refuses_to_submit_by_default():
     from downtrend_bot.exchange_adapter import CcxtAdapter
     a = CcxtAdapter("binanceusdm")
     assert a.allow_submit is False
-    res = a.create_order.__doc__ or ""
     from downtrend_bot.models import OrderIntent, OrderRequest
     req = OrderRequest(symbol=SYMS[0], side="short", action="sell",
                        intent=OrderIntent.ENTRY, order_type="limit",

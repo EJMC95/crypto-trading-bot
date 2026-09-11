@@ -1,11 +1,10 @@
 """Walk-forward, the sensitivity sweep, and the CLI's refusals."""
-import json
 import os
 import re
 
 import pytest
 
-from dt_helpers import SYMS, tape
+from dt_helpers import tape
 from downtrend_bot.backtester import Frictions
 from downtrend_bot.walk_forward import (_set, _shape, default_grid,
                                         sensitivity, walk_forward)
@@ -234,11 +233,11 @@ def test_make_examples_writes_tapes_the_loader_can_read(tmp_path, cfg, capsys):
     assert "SYNTHETIC" in capsys.readouterr().out
     back = _load_tapes(cfg, str(tmp_path))
     assert set(back) == set(cfg.symbols)
-    for sym, tape in back.items():
+    for sym, loaded in back.items():
         for tf in (cfg.timeframes.regime, cfg.timeframes.signal,
                    cfg.timeframes.execution):
-            assert tape.get(tf), (sym, tf)
-            assert all(b.high >= b.low for b in tape[tf])
+            assert loaded.get(tf), (sym, tf)
+            assert all(b.high >= b.low for b in loaded[tf])
 
 
 def test_the_sweep_reports_progress_rather_than_going_silent(cfg, markets,

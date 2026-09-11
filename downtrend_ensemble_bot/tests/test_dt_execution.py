@@ -3,12 +3,12 @@ import pytest
 
 from dt_helpers import SYMS
 from downtrend_bot.config import ExecutionConfig, StrategyConfig
-from downtrend_bot.execution import (Plan, acceptable_fill, breakeven_stop,
+from downtrend_bot.execution import (acceptable_fill, breakeven_stop,
                                      build_plan, choose_entry_order,
                                      next_client_order_id, should_time_stop,
                                      side_to_action, slippage_bps, spread_bps,
                                      trail_stop)
-from downtrend_bot.models import (OrderIntent, Position, Regime, ScoreCard,
+from downtrend_bot.models import (Position, Regime, ScoreCard,
                                   Signal, Sizing)
 from downtrend_bot.synthetic import make_market
 

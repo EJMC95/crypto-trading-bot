@@ -46,7 +46,6 @@ def test_the_breakdown_windows_do_not_overlap():
 
     This asserts the WINDOWS, not the arithmetic, because the arithmetic is
     what was subtly wrong."""
-    st = StrategyConfig(structure_window=20)
     assert S.BREAK_LOOKBACK >= 1
     # the range must end strictly before the first bar that can carry a break
     i = 300

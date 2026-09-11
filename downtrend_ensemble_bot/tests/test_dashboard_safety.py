@@ -112,9 +112,12 @@ def test_reordering_existing_entries_is_refused():
 
 @pytest.mark.parametrize("const", ["SLOW_LOOP", "STALE_SECONDS"])
 def test_changing_a_protected_constant_is_refused(const):
-    bad = BEFORE.replace(f"{const} = ", f"{const} = 1  # ").replace("  # ", " #", 1)
-    bad = BEFORE.replace("SLOW_LOOP = 30", "SLOW_LOOP = 5") if const == "SLOW_LOOP" \
-        else BEFORE.replace("STALE_SECONDS = 900", "STALE_SECONDS = 60")
+    # One assignment. An earlier draft built `bad` twice and the first was
+    # dead -- overwritten on the next line and never read, which is exactly
+    # how a test ends up asserting against a fixture nobody meant to use.
+    bad = (BEFORE.replace("SLOW_LOOP = 30", "SLOW_LOOP = 5")
+           if const == "SLOW_LOOP"
+           else BEFORE.replace("STALE_SECONDS = 900", "STALE_SECONDS = 60"))
     v = check_append_only(BEFORE, bad)
     assert not v.append_only and any(const in x for x in v.violations)
 

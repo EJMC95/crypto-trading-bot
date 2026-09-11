@@ -23,7 +23,7 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field, asdict
-from typing import Any, Callable
+from typing import Any
 
 from .logging_setup import get
 from .models import (Candle, Fill, MarketMeta, OrderIntent, OrderRequest,
@@ -80,7 +80,7 @@ class CapabilityReport:
 
     def render(self) -> str:
         w = max(len(c.name) for c in self.capabilities) if self.capabilities else 20
-        lines = [f"Lighter capability report",
+        lines = ["Lighter capability report",
                  f"  lighter-sdk : {self.sdk_version}",
                  f"  base_url    : {self.base_url}",
                  f"  chain_id    : {self.chain_id}",

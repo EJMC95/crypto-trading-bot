@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from downtrend_bot.config import AppConfig                     # noqa: E402
 from downtrend_bot.models import Candle, Market                # noqa: E402
-from downtrend_bot.synthetic import aggregate, make_market, walk  # noqa: E402
+from downtrend_bot.synthetic import make_market, walk  # noqa: E402
 
 SYMS = ["BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT"]
 
@@ -125,3 +125,10 @@ def overrun_pivot_tape(n: int = 300, t0: float = 1_700_000_000.0):
         out.append(Candle(t0 + (n - 35 + k) * 3600, px + 1.5, px + 1.6,
                           px - 0.2, px, 1200.0))
     return out
+
+
+def read_text(path) -> str:
+    """`open(p).read()` leaks the handle on any runtime that is not CPython
+    refcounting, and CodeQL flags every instance. One helper, no leaks."""
+    with open(path) as fh:
+        return fh.read()

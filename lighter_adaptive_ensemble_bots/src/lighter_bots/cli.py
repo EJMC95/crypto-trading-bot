@@ -11,15 +11,14 @@ import json
 import os
 import sys
 import time
-from typing import Any
 
 from . import reporting
 from .backtester import Backtester, Frictions
 from .config import (AppConfig, LIVE_CONFIRMATION_PHRASE, LiveGate, load,
                      validate)
-from .data import CandleSource, to_columns
-from .health import check as health_check, kill_switch_active
-from .lighter_adapter import (MockLighterAdapter, NativeLighterAdapter,
+from .data import CandleSource
+from .health import check as health_check
+from .lighter_adapter import (NativeLighterAdapter,
                               build_capability_report)
 from .logging_setup import setup
 from .market_metadata import MarketRegistry, MetadataStore, discover
@@ -371,7 +370,6 @@ def cmd_live(args) -> int:
 
 
 def cmd_flatten(args) -> int:
-    cfg = _cfg(args.config)
     from .config import FLATTEN_CONFIRMATION_PHRASE, flatten_confirmed
     if not flatten_confirmed():
         print(f"refused: FLATTEN_CONFIRMATION must be "

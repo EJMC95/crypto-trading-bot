@@ -121,3 +121,16 @@ def make_runner(tmp_dir=None, symbols=("BTC", "ETH"), bars=420,
                                  equity=start_equity)
     return Runner(cfg, adapter, MarketRegistry(markets), mode=Mode.PAPER,
                   start_equity=start_equity)
+
+
+def read_text(path) -> str:
+    """`open(p).read()` leaks the handle on any runtime that is not CPython
+    refcounting, and CodeQL flags every instance. One helper, no leaks."""
+    with open(path) as fh:
+        return fh.read()
+
+
+def write_text(path, body: str = "") -> None:
+    """The write-side twin. `open(p, "w").write(x)` leaks the same way."""
+    with open(path, "w") as fh:
+        fh.write(body)

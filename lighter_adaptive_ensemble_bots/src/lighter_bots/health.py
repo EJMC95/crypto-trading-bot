@@ -8,7 +8,6 @@ of a wrong "healthy" is an order sent on stale data.
 from __future__ import annotations
 
 import os
-import time
 from dataclasses import dataclass, field
 from typing import Any
 

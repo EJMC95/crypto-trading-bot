@@ -128,7 +128,12 @@ def size_position(*, signal: Signal, market: Market, account: Account,
     if correlated_group_count >= risk_cfg.max_correlated_positions:
         return Sizing(False, f"{correlated_group_count} correlated positions "
                              f">= {risk_cfg.max_correlated_positions}")
-    util = 0.0 if eq <= 0 else account.margin_used / eq
+    # `eq > 0` is GUARANTEED by the early return above, so a second `eq <= 0`
+    # branch here is unreachable (CodeQL: redundant comparison). Named rather
+    # than silently simplified: whoever moves that early return is the one who
+    # makes this a ZeroDivisionError, and `test_dt_risk` pins that a
+    # non-positive equity is refused BEFORE any arithmetic runs.
+    util = account.margin_used / eq
     if util >= risk_cfg.max_margin_utilisation:
         return Sizing(False, f"margin utilisation {util:.1%} >= "
                              f"{risk_cfg.max_margin_utilisation:.1%}")
@@ -201,7 +206,7 @@ def size_position(*, signal: Signal, market: Market, account: Account,
         return Sizing(False, f"rounded size risks {actual_risk:.4f}, above the "
                              f"remaining budget {budget_left:.4f}")
 
-    leverage = notional / eq if eq > 0 else 0.0
+    leverage = notional / eq          # eq > 0, established above
     if leverage > risk_cfg.max_leverage * 1.0001:
         return Sizing(False, f"{sym}: implied leverage {leverage:.2f}x exceeds "
                              f"{risk_cfg.max_leverage}x")

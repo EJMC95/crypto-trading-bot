@@ -1,5 +1,4 @@
 """Regime detection, hysteresis, and what a regime change may and may not do."""
-import pytest
 
 from dt_helpers import falling, flat, rising
 from downtrend_bot import regime as R

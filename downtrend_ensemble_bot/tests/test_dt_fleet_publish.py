@@ -9,7 +9,7 @@ import types
 
 import pytest
 
-from dt_helpers import SYMS, tape
+from dt_helpers import tape, read_text
 from downtrend_bot import fleet_publish as FP
 
 
@@ -137,13 +137,12 @@ def test_the_real_store_accepts_the_arguments_we_send(monkeypatch):
     bound with `inspect.signature`. The repo's own doc block once listed five
     parameters `publish()` does not take, and a bot that followed it raised
     TypeError at the call site inside its trading loop."""
-    import inspect
     root = os.path.join(os.path.dirname(__file__), "..", "..")
     store_path = os.path.join(root, "bot_pnl_store.py")
     if not os.path.exists(store_path):
         pytest.skip("standalone checkout: no fleet publisher to check against")
     import ast
-    tree = ast.parse(open(store_path).read())
+    tree = ast.parse(read_text(store_path))
     fn = next((n for n in tree.body
                if isinstance(n, ast.FunctionDef) and n.name == "publish"), None)
     assert fn is not None, "bot_pnl_store.publish has moved or been renamed"
@@ -199,7 +198,7 @@ def test_the_watchdog_vocabulary_is_the_one_we_publish():
     wd = os.path.join(root, "fleet_watchdog_svc.py")
     if not os.path.exists(wd):
         pytest.skip("standalone checkout: no fleet watchdog to check against")
-    body = open(wd).read()
+    body = read_text(wd)
     m = re.search(r'get\("status"\)\s+not\s+in\s+\(([^)]*)\)', body)
     assert m, "the watchdog's accepted-status tuple has moved"
     accepted = set(re.findall(r'"([a-z]+)"', m.group(1)))

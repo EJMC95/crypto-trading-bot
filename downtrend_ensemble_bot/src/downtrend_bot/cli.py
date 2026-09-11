@@ -298,8 +298,14 @@ def cmd_make_examples(cfg: AppConfig, args) -> int:
 
 def cmd_check_dashboard(cfg: AppConfig, args) -> int:
     from .dashboard_safety import certify
-    before = open(args.before).read() if args.before else ""
-    after = open(args.after).read() if args.after else before
+    def _read(path: str | None, fallback: str = "") -> str:
+        if not path:
+            return fallback
+        with open(path) as fh:          # closed on every path, including raise
+            return fh.read()
+
+    before = _read(args.before)
+    after = _read(args.after, before)
     out = certify(feed_url=args.feed, before_src=before, after_src=after,
                   new_bot_ids=(args.bot or []))
     print(json.dumps(out, indent=2, default=str))

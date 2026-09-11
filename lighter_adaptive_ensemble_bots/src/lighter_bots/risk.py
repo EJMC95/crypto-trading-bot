@@ -18,7 +18,6 @@ is a bug, and `test_risk` pins that.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from . import liquidation as liq
 from .config import RiskConfig, ExecutionConfig
