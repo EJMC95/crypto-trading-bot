@@ -1,13 +1,110 @@
+## 2026-09-11 (aar) — 🎫 THE NULL THAT BLOCKED A GO-LIVE INFERRED SIDE FROM A NULLABLE COLUMN, AND REPLAYED 7 LONGS AS SHORTS
+
+**The instrument whose verdict refused the taker's go-live had a sign bug in
+it, found by adversarially verifying my own morning's work.** The verdict does
+not move. Every number in it does, and all of them in the same direction.
+
+**THE DEFECT.** `scripts/study_taker_random_null_2026-09-10.py` decided
+direction with `str(r.get("side")) == "long"`, at BOTH call sites —
+`replay_real` (the calibration arm) and `draw_null` (the null itself). The
+public `/trades.json` feed carries **`side: null`** on a large minority of
+rows, and `str(None) == "long"` is False, so a null-sided row was replayed as
+a **SHORT**. Measured on the graded era (n=208):
+
+| side column | reason prefix | n | replayed as |
+|---|---|---|---|
+| `long` | long | 155 | long ✓ |
+| `short` | short | 34 | short ✓ |
+| `null` | short | 12 | short ✓ *by accident* |
+| **`null`** | **long** | **7** | **short ✗ — SIGN-FLIPPED** |
+
+All seven are `long-breakoutup`. Across the whole retained ledger (349 rows)
+it is **63**.
+
+**WHY IT SURVIVED A CALIBRATION GATE BUILT TO CATCH EXACTLY THIS.** The gate
+compares MEANS, and seven flipped rows out of 208 cancel: `(aaf)` reported
+|drift| **0.009pp** against a 0.60pp tolerance and passed honestly. A single
+flipped row is wrong by up to **38pp**. **A gate on an aggregate cannot see a
+per-row sign error** — which is `(po)`'s "pick a test that could detect the
+damage" one level down, and the reason the fix is pinned by an AST assertion
+at both call sites rather than by the drift number.
+
+**THE FIX: THE TAG IS THE RECORD** — `lens_of`'s own rule, one field over, in
+the same module. `side_is_long(r)` derives direction from the reason/tag
+prefix, which every row carries, and falls back to the `side` column only for
+a tag it cannot read. Pinned in the module's selftest by AST at BOTH sites
+(`side_is_long(` present, `'side') == 'long'` absent) — a substring check on
+one site would have left the other deletable. Mutation red.
+
+**RE-RUN, CORRECTED (1,000 draws, calibration |drift| 0.019pp on all 208
+closes — better than before):**
+
+| family | `(aaf)` published | **corrected** |
+|---|---|---|
+| POOLED | +0.953 vs +1.064, −0.111pp, P=0.590 | **+0.902 vs +1.075, −0.174pp, P=0.636** |
+| **short-divergence** | −0.788 vs −0.564, −0.224pp, P=0.660 | **−0.788 vs −0.371, −0.417pp, P=0.734** |
+| long-breakoutup | +1.454 vs +1.532, −0.078pp, P=0.520 | **+1.382 vs +1.486, −0.105pp, P=0.567** |
+
+**THE VERDICT IS UNCHANGED AND STRONGER ON EVERY FAMILY.** No family beats a
+coin flip; the only family `LIVE_SIDES` admits reads **P=0.734**, worse than
+published. `(aaf)`'s table is superseded and corrected in place per I12 — a
+future session quoting the old digits would be quoting a mis-signed replay.
+
+**`(aan)`'s CORRECTION OF `(aaf)` SURVIVES, re-checked against the fixed
+instrument:** `long-breakoutup` at −0.105pp / P=0.567 is still **TIED** with
+random rather than beaten, and its one-sided upper bound still excludes
+nothing — so I17-as-amended still forbids retiring the book on this evidence.
+
+**HOW IT WAS FOUND, because the method is the transferable part.** Not by
+re-reading the code — by an adversarial verification lens that **recomputed
+seven cells from scratch** through its own loader, its own quantiles, its own
+cluster-SE and its own t-tail, and then reported the disagreements. It also
+refuted the headline of the work it was verifying (below), which is what an
+independent check is for. Three defects today were found this way and none by
+inspection.
+
+**TWO MORE DEFECTS IT FOUND IN THE SAME PASS, recorded rather than fixed,
+because both push the refusal the same way and neither changes a verdict:**
+* **THE CALIBRATION GATE CERTIFIES A PRICE BASIS THE NULL NEVER USES.**
+  `replay_real` enters at the ledger's own FILL price; `mu` is built from a
+  path that enters at an hourly BAR CLOSE. Run the book's own 208 closes
+  through *that* path and the drift is **0.661pp** — above the 0.60pp
+  tolerance, i.e. it would REFUSE. So `d_i` mixes two price bases and the
+  asymmetry (0.32–0.58pp) is LARGER than the excess it measures. On one
+  consistent basis the family excess reads **−0.993pp (t −1.17)**, not
+  −0.242pp. **Against the book, so the refusal strengthens.**
+* **THE NULL IS TIME-BLIND.** Both docstrings say *"same coin, same window"*;
+  the draw is in fact uniform over the coin's entire ~46d tape. Hour-matched
+  bias is small (−0.100 to +0.136pp) but **weekend bias is +0.632pp**. No
+  verdict moves; no time-conditioned cell may be read as matched.
+
+Both are CARRIED (`null-basis-and-window-mismatch`) rather than patched in the
+same pass — one surface per pass, verified in the live payload, which is the
+rule `(fz)` was written to enforce.
+
 ## 2026-09-11 (aaq) — 🎫 "WIDEN UNTIL YOU FIND AN EDGE": 126 CELLS ON THE POPULATION THE BOOK NEVER CONDITIONED ON, AND THE BEST ONE IS WORSE THAN NOISE
 
 **Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for
 it."* Run properly, pre-registered, and reported whichever way it came out.
 
 **THE ANSWER: NO CELL SURVIVES.** 126 pre-declared cells, 2,736 graded
-episodes, four lenses, 8.3 days. Not one clears Benjamini-Hochberg at FDR 0.05
-— and the best cell found (`momentum/prem_bps>=p75`, **z=2.13**) sits **BELOW
-the noise-search p95 of 2.37**: a pure-noise search of the same shape produces
-a better best cell than this one did.
+episodes, four lenses, 8.3 days. The best cell found
+(`momentum/prem_bps>=p75`, **z=2.13**) sits **BELOW the noise-search p95 of
+2.37**: a pure-noise search of the same shape produces a better best cell than
+this one did.
+
+**AND THE PERMUTATION ALONE IS WHAT KILLS IT — stated precisely, because the
+bar here is deliberately belt-and-braces and it would be easy to credit the
+wrong half.** The pre-registered rule requires BH at FDR 0.05 **and** beating
+the permutation max-statistic. A parallel adversarial review of the sibling
+sweep measured that stacking those two DOUBLE-COUNTS: Westfall-Young max-T
+already controls family-wise error and adapts to the dependence, while
+BH-at-rank-1 is Bonferroni and does not — effective multiplicity there
+measured **8-9, not 152**, a ~17x over-penalty, enough to kill a planted
++2.00pp positive control that max-T alone correctly FIRES on. **That critique
+does not rescue anything here:** this run's best cell fails the permutation
+test on its own, before BH is ever consulted. So the refusal rests on the
+half that is not over-penalised.
 
 **WHY THE OFFERED SET, AND IT IS THE WHOLE METHODOLOGICAL POINT.** A threshold
 sweep over the book's own closes searches a population it already SELECTED,
@@ -941,6 +1038,15 @@ calibration gate that reproduces the ledger to **0.009pp**.
 | POOLED | 206 | +0.953% | **+1.064%** | −0.111pp | **0.590** | +0.74 |
 | **short-divergence** | 46 | **−0.788%** | −0.564% | −0.224pp | **0.660** | −0.80 |
 | long-breakoutup | 160 | +1.454% | **+1.532%** | −0.078pp | **0.520** | +1.49 |
+
+**[11-Sep (aar)] SUPERSEDED — this table was computed by an instrument that
+inferred direction from a NULLABLE column and replayed 7 of 208 era closes
+(all `long-breakoutup`) as SHORTS.** The calibration gate could not see it: it
+compares means, and seven flipped rows cancel to 0.009pp. Corrected instrument,
+1,000 draws, |drift| 0.019pp on all 208: **POOLED −0.174pp P=0.636 ·
+short-divergence −0.417pp P=0.734 · long-breakoutup −0.105pp P=0.567.** The
+verdict is unchanged and STRONGER on every family — quote those digits, not
+these.
 
 **Random wins in all three splits.** Same result (hm) got six times on this
 book in July; this is confirmation on the CURRENT era and the CURRENT policy,

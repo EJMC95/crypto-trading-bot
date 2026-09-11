@@ -93,6 +93,43 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "null-basis-and-window-mismatch",
+        "owner": "session",
+        "what": "(aar) adversarial verification of the taker's random-entry "
+                "null found THREE defects. One is FIXED (the side inference "
+                "read a nullable column and replayed 7 of 208 era closes as "
+                "SHORTS; corrected to derive from the tag, AST-pinned at both "
+                "call sites, verdict unchanged and stronger on every family). "
+                "TWO ARE RECORDED AND NOT PATCHED. (1) THE CALIBRATION GATE "
+                "CERTIFIES A PRICE BASIS THE NULL NEVER USES: `replay_real` "
+                "enters at the ledger's own FILL price while the null's `mu` "
+                "enters at an HOURLY BAR CLOSE, so `d_i` mixes two bases; run "
+                "the book's own closes through the null's path and the drift "
+                "is 0.661pp, ABOVE the 0.60pp tolerance -- i.e. on one "
+                "consistent basis the gate would REFUSE, and the family "
+                "excess reads -0.993pp (t -1.17) rather than -0.242pp. (2) "
+                "THE NULL IS TIME-BLIND: both docstrings claim 'same coin, "
+                "SAME window' and the draw is uniform over the coin's entire "
+                "~46d tape. Hour bias is small (-0.100 to +0.136pp); WEEKEND "
+                "bias is +0.632pp.",
+        "why_open": "NOT patched in the same pass under the fleet's own 'ship "
+                    "narrow, verify in the live payload, then widen' rule -- "
+                    "(fz) changed six surfaces at once and spent six entries "
+                    "repairing itself. BOTH defects push the refusal the SAME "
+                    "way (against the book), so no verdict of (aaf)/(aan)/"
+                    "(aar) depends on them and nothing is blocked on this. "
+                    "What IS blocked: no time-conditioned cell from this null "
+                    "may be read as matched until (2) is fixed, and no "
+                    "absolute level from it may be quoted until (1) is. Fix "
+                    "(1) by walking BOTH arms from the same price basis "
+                    "(prefer the bar close, which the null cannot avoid) and "
+                    "re-running the gate; fix (2) by drawing within a matched "
+                    "window rather than the whole tape. Closes when the "
+                    "CHANGELOG records 'null basis+window READ:' with the "
+                    "re-run numbers.",
+        "closes_when": lambda: _has("CHANGELOG.md", "null basis+window READ:"),
+    },
+    {
         "id": "live-vs-graded-policy-two-mechanisms-uncovered",
         "owner": "session",
         "what": "(aan) shipped `golive_readiness.live_fillable`, which closes "
