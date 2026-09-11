@@ -93,6 +93,44 @@ def _has(path, needle):
 # ---------------------------------------------------------------------------
 CARRIED = [
     {
+        "id": "offered-set-feed-window-caps-the-only-powered-search",
+        "owner": "session",
+        "what": "(aaq) THE CHEAPEST LARGE WIDENING AVAILABLE TO THIS FLEET, "
+                "and it is a FEED CONSTANT rather than a recording gap. The "
+                "scout's OFFERED ticket population -- the only taker "
+                "population with enough power to resolve an effect the size "
+                "anyone hopes for (mde80 0.30%/trade at n=2,736, against the "
+                "ledger's 1.26) -- is retained for 60 DAYS by "
+                "`bot_pnl_store.prune_history`, and the only reason the "
+                "11-Sep search saw 8.3 of them is that `pnl_dashboard` caps "
+                "`/bus.json?hours=` at 200h. Measured: `tickets` are 9.7% of "
+                "the lighter-market payload (1.09 MB of 11.21 MB per 24h), so "
+                "60d of TICKETS is ~65 MB against 672 MB for the whole "
+                "payload. A tickets-only projection on that SELECT plus a "
+                "higher cap on that path takes the search from 8.3d to 60d -- "
+                "~7x n, mde80 0.30 -> ~0.11%/trade -- and it is "
+                "DASHBOARD-ONLY: no trading image, no deploy marker, no "
+                "expectancy price, no trade changes.",
+        "why_open": "NOT shipped in the pass that found it, deliberately. It "
+                    "changes a shared READ PATH on `bot_state_history` -- the "
+                    "table behind (zq)'s lock convoy, where a never-committed "
+                    "read transaction blocked every bot's publish fleet-wide "
+                    "for ~40 minutes including both real-money rows. A wider "
+                    "SELECT on that table earns its own careful pass with the "
+                    "autocommit/lock_timeout discipline and a measured query "
+                    "plan, not a tired one at the end of a long session. "
+                    "BEFORE SHIPPING: confirm the projection actually reduces "
+                    "the scan (not just the payload), check "
+                    "`pg_blocking_pids` during a trial run, and verify no "
+                    "publisher queues behind it. THEN re-run "
+                    "`scripts/study_taker_offered_2026-09-11.py` at the wider "
+                    "window -- its pre-registration "
+                    "(PREREG_TAKER_OFFERED_2026-09-11.md) still governs and "
+                    "the bar does not move. Closes when the CHANGELOG records "
+                    "'offered-set 60d READ:' with the re-run verdict.",
+        "closes_when": lambda: _has("CHANGELOG.md", "offered-set 60d READ:"),
+    },
+    {
         "id": "null-basis-and-window-mismatch",
         "owner": "session",
         "what": "(aar) adversarial verification of the taker's random-entry "

@@ -192,6 +192,40 @@ this fleet counts as compliance (I26), and it is NOT a retirement case: the
 upper bound on the breakoutup excess is **+0.68pp > 0**, so nothing has been
 excluded (I17-as-amended).
 
+**AND THE VARIANCE ROUTE IS CLOSED TOO, WHICH IS THE OTHER HALF OF "WIDEN".**
+Splitting is what the cells tested; the alternative is a covariate that
+shrinks the residual and therefore the detection floor (`mde ∝ sqrt(1−R²)`).
+Measured per-feature eta² on the era's 162 breakoutup closes against a null
+E[eta²] of **0.0124**: `hour_utc` 0.0185 · `brk_quality` 0.0147 · `chg_pct`
+0.0091 · `apr_pct` 0.0063 · `prem_bps` 0.0053 · `range_pos` 0.0047 · `vol_m`
+0.0030 · `up_strength` 0.0029. **Not one recorded entry-time feature explains
+more of the per-trade variance than chance does.** The best real covariate
+available is `exit_reason` — an OUTCOME, so inadmissible — and even it is
+worth only 2.27pp → 2.17pp. **Halving the floor would need R²=0.75.**
+
+**A FOUND-AND-REPORTED ARTIFACT IN THAT TABLE, and it is the instructive
+one:** `apr_pct` first read **eta²=0.2867**, monotone across terciles
+(−2.39 / +0.51 / +6.02) — a headline. It was a tie-ordering artifact: **118 of
+162 closes carry the identical venue resting default 10.5**, and sorting
+`(value, pnl)` tuples ordered those ties BY OUTCOME. Under 200 random
+tie-breaks the median is **0.0063 — below the null.** The sibling sweep hit
+the same wall honestly, printing `UNCOMPUTABLE: duplicate cut point` on its
+`apr_pct` p40/p60/p80 cells.
+
+**THE ONE CHEAP, LARGE, ACTIONABLE WIDENING FOUND ALL DAY — and it is a FEED
+CONSTANT, not a recording gap.** The offered population is already recorded
+for **60 days** (`bot_pnl_store.prune_history`), and the only reason this
+search saw 8.3 of them is that `pnl_dashboard` caps `/bus.json?hours=` at
+**200h**. Measured: `tickets` are **9.7% of the payload** (1.09 MB of 11.21 MB
+per 24h), so 60d of tickets is ~**65 MB** against 672 MB for the whole thing.
+A tickets-only projection plus a higher cap on that path is **dashboard-only —
+no trading image, no deploy marker, no expectancy price — and takes the one
+population that HAS power from 8.3d to 60d, ~7x n, mde80 0.30pp → ~0.11pp.**
+CARRIED as `offered-set-feed-window-caps-the-only-powered-search` rather than
+shipped in this pass: it changes a shared read path on
+`bot_state_history`, the table behind `(zq)`'s lock convoy, and that earns its
+own careful pass rather than a tired one.
+
 **THE PRODUCTIVE HALF, and it shipped separately as `(aap)`:** the search's
 real constraint is not the threshold, it is **what the book records**. The
 taker captured SIX ticket fields where the scout publishes ELEVEN, and not one
@@ -226,6 +260,22 @@ dropped: `noncrypto` (every lens), `trend` (dip), and `lighter_apr` /
 falling-BTC regime, so a directional grade is a grade *in that regime only* —
 and `regime` is precisely the field that would let a grader split it. 41 days
 of closes cannot answer that question, and no later session can recover it.
+
+**[CORRECTED IN PLACE the same day per I12 — "every lens publishes `regime`"
+OVERSTATES IT, in the direction that oversells this fix.** Every lens EMITS
+the key, which is what was checked; the measured PRESENCE rate over 68,774
+ticket observations is **23.6%** — breakout 26.6%, momentum 37.4%, dip 20.0%,
+divergence **7.6%** — and when present it is **64% `LONG-window`**, with
+`SHORT-window` on 164 observations of 16,203. On this book's own
+crypto-breakout tickets at its own conviction bars a parallel measurement puts
+presence at 48.6% and `LONG-window` at 643 of 692. **So `regime` will land on
+roughly a quarter to a half of future closes and is NEAR-DEGENERATE as a split
+today.** The capture is still right — absent stays absent, it costs nothing,
+and it is the field that becomes informative the day the regime actually
+changes, which is the only day it could ever be checked. But it is a FORWARD
+RECORD, not an analysis unlock, and this entry read as the latter. The number
+was in front of me when I wrote it (`regime types: dict 2650, NoneType 7380`)
+and I generalised past it.**
 
 **THIS IS `(di)`'s DEFECT, ONE TURN LATER, ON DIFFERENT FIELDS.** `(di)`
 captured `brk_quality`/`up_strength` *"so winning criteria can be DERIVED from
