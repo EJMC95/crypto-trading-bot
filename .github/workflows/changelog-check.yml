@@ -212,6 +212,16 @@ jobs:
         run: python3 scripts/audit_live_roster.py
       - name: The roster guard must fire on a stale declaration, not merely stay quiet
         run: python3 scripts/audit_live_roster.py --selftest
+      # [2026-09-11] The five scheduled review routines' PROMPTS are tracked
+      # now (scheduled_tasks/), so they get the same guard as the code: every
+      # repo path they name must exist, and none may name a retired live row.
+      # The divergence arm (tracked copy vs the installed ~/.claude copy) is
+      # local-only and reports SKIPPED here — a CI runner has no home tree,
+      # and SKIPPED is deliberately not CLEAN ((kw)).
+      - name: The routines' prompts must name only paths and rows that still exist
+        run: python3 scripts/audit_task_prompts.py
+      - name: The prompt guard must fire, not merely stay quiet
+        run: python3 scripts/audit_task_prompts.py --selftest
 
   undefined-names:
     name: No name is read in shipped code that is bound nowhere

@@ -1,6 +1,6 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 11:35 Sydney (01:35Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 12:05 Sydney (02:05Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
@@ -13,11 +13,16 @@ _Generated 2026-09-11 11:35 Sydney (01:35Z) by `scripts/session_state.py`. Do no
 **🚦 AT THE GATE**
 
 - `freqtrade-avo-maria-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing.
-- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it.
+- `lighter-ticket-taker-lshadow` is **READY — 6/6 bars**. Going live is Eamon's explicit act; it is never an automatic consequence of passing. **BUT ITS LIVE ARM WOULD FILL NOTHING** — A LIVE arm of this book could have filled 0 of 208 graded closes. 162 (77.9%) are outside its own live allow-list — +134.00, +1.382%/trade, t=+2.70 it may never fill. Structurally fillable: n=46, -17.35, -0.788%/trade, t=-1.31; of those, 46 sit in a lens the book has itself VETOED. THE LIVE ARM'S FILLABLE SET IS EMPTY — `ready` describes the SHADOW policy only, and a go-live today fills nothing. The era is deliberately NOT re-cut and no bar moves: the graded sample is the shadow book's record and the shadow book earned it. Its mean (0.902%/trade) sits INSIDE the [0.2, 1.1]%/trade band a RANDOM entry pays on this venue — the six bars test against ZERO and cannot tell it from drift ((hm)).
 - `perps-funding-carry-lshadow` is one bar short (5/6) — failing: halves.
 - `pm-turnbull-lshadow` is one bar short (5/6) — failing: t.
 
 ## Carried — pick these up FIRST (I11)
+
+### `market-context-realerts-a-retired-books-frozen-census`  ·  owner: **session**
+(aba) THE SOURCE HALF OF THE FOSSIL-ALERT FIX IS NOT SHIPPED. `market_context.fire_alerts` reads `lighter-dislocation-lshadow` and fires one `disloc:<coin>` alert per census entry with NO age check on the publisher -- content before liveness, which is I1 -- and `_alert`'s dedup refreshes `last_seen` on every hit, so `fleet_immune.alert_fossils`' age arm can never reach them. 🧲 Snap Back was retired 4-Aug (jh); its census has been frozen since, and it was still manufacturing 19 fresh alerts a day five weeks later. MEASURED on the 10-Sep evidence review: 19 of 23 verdict rows were that one dead book repeating one sentence. TWO layers shipped today -- the antibodies that neutralise it in the bloodstream (`fleet_immune.ANTIBODIES`, aim-tested against the publisher's own format strings) and the render-side fold that stops the report being 83% fossil -- and BOTH are downstream of a source that keeps lying.
+
+_Still open because:_ The source fix is an age gate at that read, in `market_context.py`, which is a SHIPPED service: it needs the publisher's `updated` stamp read and a bar chosen, then a deploy and a payload readback, which is more than an antibody costs and was not done in the pass that found it. The same `_alert` shape appears at SIX other call sites in that file, so the honest fix is the CLASS (a freshness gate every alert source passes through), not a seventh instance. Closes when `market_context.py` reads the publisher's age before its census and the CHANGELOG records it -- at which point the two antibodies can be deleted and this row with them.
 
 ### `offered-set-feed-window-caps-the-only-powered-search`  ·  owner: **session**
 (aaq) THE CHEAPEST LARGE WIDENING AVAILABLE TO THIS FLEET, and it is a FEED CONSTANT rather than a recording gap. The scout's OFFERED ticket population -- the only taker population with enough power to resolve an effect the size anyone hopes for (mde80 0.30%/trade at n=2,736, against the ledger's 1.26) -- is retained for 60 DAYS by `bot_pnl_store.prune_history`, and the only reason the 11-Sep search saw 8.3 of them is that `pnl_dashboard` caps `/bus.json?hours=` at 200h. Measured: `tickets` are 9.7% of the lighter-market payload (1.09 MB of 11.21 MB per 24h), so 60d of TICKETS is ~65 MB against 672 MB for the whole payload. A tickets-only projection on that SELECT plus a higher cap on that path takes the search from 8.3d to 60d -- ~7x n, mde80 0.30 -> ~0.11%/trade -- and it is DASHBOARD-ONLY: no trading image, no deploy marker, no expectancy price, no trade changes.
@@ -124,8 +129,19 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (57 commit(s), entries (zt))
+## Shipped today (68 commit(s), entries (zt))
 
+- `5d42f43` wip: CI wiring + carried row
+- `7fe205f` wip: antibodies for the retired book's fossils
+- `974f5ba` wip: drive the quarantine branch, resolve both path roots
+- `ad33a80` wip: sibling imports resolve under both paths
+- `36bf89c` wip: live_pnl_audit grades the filtered sample
+- `a59e308` wip: make the quiet-when-current branch drivable
+- `74b34f4` wip: close two vacuous assertions the mutation round found
+- `33b4e57` wip: prompt audit + tracked prompts
+- `9271d5d` wip: review cadence instrument + fold same-cause verdict rows
+- `a4a0688` [deploy-live-mum] (aaw) the drawdown bar's two peaks, and the stop-death pager's clip-OFF ceiling — both published beside, neither switched
+- `f0ca3b0` (aau) regenerate HANDOFF
 - `3582b6a` (aau) the refusal goes where money is armed; the random-band screen the six bars cannot apply
 - `28305fb` (aat) the random-band screen the six bars cannot apply
 - `987c6a6` (aat) golive_blocker reads live_fillable — the stop belongs where money is armed

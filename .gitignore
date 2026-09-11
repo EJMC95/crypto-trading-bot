@@ -24,7 +24,22 @@ data/
 
 # ---- Sniper / digest runtime state (machine-local; Railway seeds its own) ----
 sniper_data/
-reports/
+# `reports/*` and NOT `reports/` — git never descends into an excluded
+# DIRECTORY, so with the bare form the negation below is dead. Verified: with
+# `reports/`, `git check-ignore -v reports/expansion_research_log.md` still
+# reports it ignored by that very line.
+reports/*
+# [2026-09-11] reports/ was ignored as "digest runtime state" and the fleet's
+# JUDGEMENT LAYER then moved in behind that line. The research log is the one
+# file in there that is a durable record rather than a rendering: ~20
+# refutations over 1,762 lines whose entire job is that no idea is tested
+# twice — and it lives in ONE un-backed-up copy that no worktree and no fresh
+# clone can see. A negation cannot re-include a file whose parent directory is
+# excluded, which is why the line above is `reports/*`, not `reports/`.
+# NARROW ON PURPOSE: un-ignoring `reports/*.md` would track 115 files / 1.3 MB
+# of daily renderings in one commit. That is Eamon's call, not a side effect of
+# this one; the refutation record is the part that must survive a machine.
+!reports/expansion_research_log.md
 
 # ---- Backups / editor / OS cruft ----
 *.bak

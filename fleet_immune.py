@@ -91,6 +91,22 @@ FUTURE_SKEW_S = float(os.environ.get("IMMUNE_FUTURE_SKEW_S", "2"))
 ANTIBODIES = [
     ("live vs shadow P&L gap", "retired whole-book divergence artifact "
                                "(replaced 15-Jul by the paired per-coin check)"),
+    # [2026-09-11] 🧲 Snap Back was RETIRED 4-Aug (jh) and its frozen census is
+    # still being re-alerted every cycle: `market_context.fire_alerts` reads
+    # `lighter-dislocation-lshadow` with NO age check (I1 — content before
+    # liveness), and `_alert`'s dedup refreshes `last_seen`, so the age arm
+    # above can never reach them. MEASURED on the 10-Sep review: **19 of 23
+    # verdict rows** were this one dead book, each repeating the same sentence,
+    # every day for five weeks — the fleet's most-read table, 83% fossil.
+    # Both substrings are taken from the publisher's own format strings
+    # (market_context.py:390-396), not guessed.
+    # THE SOURCE FIX is the age gate at that read; this neutralises the
+    # bloodstream today for every consumer, and is removed the day 🧲 is
+    # resurrected (`SNAPBACK_RETIRED_OVERRIDE=run`).
+    ("🧲 tradeable dislocation on", "🧲 Snap Back retired 4-Aug (jh) — its "
+                                    "census is frozen, not a live condition"),
+    ("🧲 dislocation census reached", "🧲 Snap Back retired 4-Aug (jh) — its "
+                                      "census is frozen, not a live condition"),
 ]
 
 

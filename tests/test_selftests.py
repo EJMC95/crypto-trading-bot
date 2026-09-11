@@ -91,6 +91,16 @@ SELFTEST_MODULES = [
     # added the tool, caught by this very guard on the PR's first CI run —
     # the "selftest nobody runs" shape, prevented by its own detector.
     "scripts.live_pnl_audit",
+    # [2026-09-11] THE REVIEW ROUTINES' OWN INSTRUMENTS. Both --selftests are
+    # offline and pure (temp dirs, injected rosters, a frozen clock; no git
+    # beyond an optional worktree probe, no DB, no network), so they belong
+    # here rather than in SELFTEST_EXCLUDE, and both are registered in the
+    # commit that adds them per this guard's own rule.
+    #   review_cadence      -- did the five scheduled review routines actually
+    #                          run? Nothing in this repo knew they existed.
+    #   audit_task_prompts  -- their prompts, now tracked, held to the same
+    #                          no-retired-row / paths-resolve rules as the code.
+    "scripts.review_cadence", "scripts.audit_task_prompts",
     # [2026-08-18 (qd)/I21] the WINNERS' DOCKET. SELFTEST_MODULES and
     # deliberately NOT ENFORCED_AUDITS, per this file's own rule: its verdict
     # reads the live ledger, which moves with every close and no code change.

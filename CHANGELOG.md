@@ -1,3 +1,119 @@
+## 2026-09-11 (aba) — THE FIVE ROUTINES THAT REVIEW THIS FLEET WERE THE ONE THING IT DID NOT INSTRUMENT: HALF THEIR DAYS ARE MISSING, AND NOTHING NOTICED
+
+**Eamon, 11-Sep:** *"improve crypto research review, daily evidence review,
+crypto daily pnl, and weekly pnl routines."*
+
+**THE MEASUREMENT THAT REFRAMED THE TASK.** Over 4-Aug..10-Sep (38 days) the
+daily brief produced **18 reports of 38 (53% missing)** and the daily review
+**20 of 38 (47%)**; the weekly verdict is missing 31-Aug outright, and of its
+four surviving reports exactly **ONE was written in its own slot** (the others
+stamp "Thu 13-Aug 13:20", "Wed 26-Aug 07:15", and one written 81 minutes
+BEFORE the cron it claims to judge). The briefs that did run are stamped
+11:40 and 15:45 AEST against an 08:07 slot. **Not one of those gaps was
+noticed by anything** — and `grep -rl` over `scripts/` and `.github/` for the
+task ids returns the CHANGELOG and one comment: **nothing in this repo knew
+these jobs existed.** The fleet that pages on a 12-hour organ silence had no
+idea its own reviewer had been quiet for six days.
+
+Cause, where it can be established and not further: 7–13 Aug is the recorded
+entitlement outage (15 runs died on arrival while `lastRunAt` advanced daily);
+4, 5 and 8 Sep show **zero Claude sessions across every project on this
+machine**, i.e. a local scheduler that did not fire. 5-Aug is undiagnosed and
+is recorded as undiagnosed.
+
+**`scripts/review_cadence.py` — the liveness instrument, and the declaration.**
+One place now says what each routine's cadence is and what output proves a run
+finished (a dated file, or a dated section in an append-only log). It reports
+OUTPUTS, never `lastRunAt`, which is documented to advance on a run that died
+on arrival. FAIL-CLOSED: an unreadable reports directory is UNKNOWN, never OK,
+and the two UNKNOWN causes are distinguishable in the message (a mutation
+round proved a status-only assertion vacuous). It resolves `reports/` across
+worktrees from git — the first live run, from a session worktree, reported all
+five routines "never seen" because per-session worktrees see an empty
+`reports/`, which is exactly how a detector teaches its reader to ignore it.
+`evidence_review` now leads its report with the gap line and is QUIET when
+current.
+
+**THE DELIVERABLE IS EMITTED BY THE SCRIPT NOW.** Eamon asked on 6-Sep for
+improvement suggestions "permanently every day"; the section existed only if
+the model wrote it by hand after the script ran, so a run that died in between
+shipped a report with the deliverable missing — and the carried-forward half
+had no mechanical source at all. `write_report` now always emits
+**OPTIONS TO OPTIMISE**, pre-filled with the CARRIED rows derived from
+`session_state.py` and their predicates, plus an unfilled ranked list that is
+visibly unfinished rather than absent.
+
+**AND THE MOST-READ TABLE IN THE FLEET WAS 83% ONE DEAD BOOK.** Measured on
+the 10-Sep review: **19 of 23 verdict rows** were the same 40-word sentence
+about 🧲 Snap Back, retired 4-Aug, and it had read that way every day for five
+weeks. `market_context.fire_alerts` reads that book's frozen census with NO
+age check (I1 — content before liveness) and `_alert`'s dedup refreshes
+`last_seen`, so `alert_fossils`' age arm can never reach them. Two layers
+shipped: `fleet_immune.ANTIBODIES` entries aimed at the publisher's OWN format
+strings (`tests/autonomy/test_immune_antibodies.py` fails on an antibody that
+matches no publisher text — an antibody is a substring, and a substring is a
+guess until something checks it), and a render-side fold that collapses
+same-cause rows while leaving `payload["verdicts"]` per-key, because that is a
+consumer contract and a report is for a human. **The SOURCE fix is NOT
+shipped** and is a CARRIED row with a predicate: the same `_alert` shape sits
+at six other call sites, so the honest fix is the class, not a seventh
+instance.
+
+**THE PROMPTS ARE IN THE REPO NOW, AND UNDER A GUARD.** They lived in
+`~/.claude/scheduled-tasks/` where nothing could diff, test or grep them — and
+they rotted exactly as CLAUDE.md's own four-times-stale rule predicts:
+`crypto-daily-pnl` named 💸 the Funding Farmer's live arm as current
+real-money surface for **20 days** after its 22-Aug retirement, invisible to
+`audit_live_roster`'s prose arm because that guard reads `CLAUDE.md` and
+nothing else. `scheduled_tasks/*/SKILL.md` are tracked;
+`scripts/audit_task_prompts.py` (CI) holds them to three rules — every repo
+path resolves, no prompt names a retired live row (imported from
+`fleet_books`, so the guard cannot disagree with the fleet about who holds
+real money), and the tracked copy matches the installed one. Scope is
+DERIVED, not listed: a task is in scope iff its own prompt names this repo, so
+Eamon's personal jobs are correctly invisible. The untracked fleet backlog is
+a declared RATCHET.
+
+**ALL FOUR PROMPTS REWRITTEN**, each now starting from the cadence check and
+`HANDOFF.md` — which **no routine read**, while the daily review kept a
+hand-maintained priorities list last refreshed 4-Aug that still named retired
+books. Also corrected: the lever-routing row that forbade what (kd) permitted
+five weeks ago (fixed as a SLOT scope, not a loosening — an unattended job not
+touching real money is defensible; a session reading it as doctrine and
+declining authorised work is the (vd) failure); the winners-docket
+pre-registrations, hand-listed and missing both real-money ones, now imported;
+the REACH bullet quoting the pooled long budget its own tests forbid
+rendering; "the script overwrites this file", false since 6-Sep. The review
+gets an email channel — it produced Eamon's stated daily deliverable to a file
+on disk and nothing else.
+
+**A REAL-MONEY CORRECTNESS FIX FELL OUT OF IT.** `scripts/live_pnl_audit.py`
+— the DAILY live-money audit in CI — read the public `/trades.json` raw, which
+CLAUDE.md says in as many words does not apply the quarantine or phantom
+filters. Measured on 🙏 avo's LIVE arm: **RAW n=27, +2.184%/trade, t=+2.45
+against FILTERED n=18, +3.275%, t=+2.58** — nine halt/flatten EVENTS counted
+as trades, and **9 of the fleet's 13 phantoms are hers**, so the hazard
+concentrates on real money. Fixed by importing the owners, never
+re-implementing; both fail OPEN and an unavailable owner ANNOUNCES itself.
+Its own new test then failed honestly and found a second defect: under
+`python -m scripts.live_pnl_audit` (how the suite runs it) `golive_readiness`
+did not resolve at all, so the filter was dark and `EXPECTED_LIVE_ROWS` had
+been silently `()` in that context all along — the two owners live in
+different directories and exactly one resolved under each invocation path.
+Both paths now resolve both.
+
+**MUTATION ROUNDS, and three of them landed on my own work** — the verdict
+fold 4/4, the prompt audit 5/5, the antibody guard 2/2, the live-money filter
+3/3 after two survivors exposed a vacuous conditional assertion and the import
+asymmetry above, and `review_cadence` 6/6 after two survivors exposed a
+status-only assertion and a fixture that could not discriminate. **Refused with
+evidence:** un-ignoring all of `reports/` (115 files / 1.3 MB in one commit —
+the research log alone is tracked, the rest is Eamon's call), and re-typing
+`evidence-review`'s organ key to carry a TTL (its `ttl=None` is the deliberate
+EVENT type, and `pnl_dashboard` says why in its own words — a row permanently
+DARK by design is how operators learn to ignore DARK; the liveness question
+needed a key of its own, not a re-type of an event key).
+
 ## 2026-09-11 (aau) — `ready: true` BESIDE "A LIVE ARM FILLS NOTHING" WAS ONE FIELD ANSWERING TWO QUESTIONS — AND THE FIX BELONGS WHERE MONEY IS ARMED, NOT IN THE GRADER
 
 **Eamon, 11-Sep:** *"it said its been ready to go live for 6 days and now its
