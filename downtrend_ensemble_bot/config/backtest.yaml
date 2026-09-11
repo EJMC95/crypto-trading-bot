@@ -1,0 +1,77 @@
+# BACKTEST -- the default mode. No credentials are read, no orders exist.
+mode: backtest
+exchange: mock
+symbols:
+  - BTC/USDT:USDT
+  - ETH/USDT:USDT
+  - SOL/USDT:USDT
+  - BNB/USDT:USDT
+  - XRP/USDT:USDT
+  - AVAX/USDT:USDT
+benchmark_symbol: BTC/USDT:USDT
+allow_longs: true          # longs exist and are DISABLED by the regime engine
+                           # in a bearish market -- that is a rule, not a flag
+data_dir: data
+runtime_dir: runtime
+reports_dir: reports
+state_db: runtime/backtest.sqlite
+log_level: INFO
+
+timeframes:
+  regime: 4h
+  signal: 1h
+  execution: 15m
+
+risk:
+  risk_per_trade: 0.0025          # 0.25% of equity per trade (spec 8)
+  max_portfolio_risk: 0.0075      # 3 concurrent trades at full size
+  max_daily_loss: 0.015
+  max_weekly_loss: 0.04
+  max_leverage: 1.5               # spec 1: "start with leverage limited to 1.5x"
+  max_concurrent_positions: 3
+  max_correlated_positions: 2
+  max_notional_per_symbol_pct: 0.25
+  max_aggregate_short_notional_pct: 0.50
+  max_margin_utilisation: 0.35
+  max_consecutive_losses: 4
+  correlation_penalty: 0.5
+
+strategy:
+  minimum_score: 70.0
+  minimum_reward_risk: 1.8
+  adx_threshold: 20.0
+  max_entry_distance_atr: 0.75
+  max_holding_days: 5.0
+  atr_stop_buffer: 0.25
+  max_stop_distance_atr: 3.0
+  structure_window: 20
+  tp1_r: 1.5
+  tp1_fraction: 0.35
+  tp2_r: 2.5
+  tp2_fraction: 0.35
+  ema_fast: 20
+  ema_mid: 50
+  ema_slow: 200
+
+regime:
+  enabled: true
+  bullish_risk_multiplier: 1.0
+  neutral_risk_multiplier: 0.5
+  bearish_risk_multiplier: 0.0    # validated: BEARISH disables new LONGS
+  high_volatility_risk_multiplier: 0.35
+  panic_risk_multiplier: 0.0      # validated: PANIC means no new entries
+  minimum_regime_confirmation_candles: 2
+  market_breadth_threshold: 0.55
+  high_volatility_atr_percentile: 90.0
+  btc_extra_confirmation_candles: 2
+  neutral_minimum_reward_risk: 2.0
+  neutral_score_bump: 5.0
+
+backtest:
+  start_equity: 10000.0
+  spread_bps: 3.0
+  slippage_bps: 4.0
+  funding_per_hour: 0.0000125     # positive costs LONGS and PAYS shorts
+  partial_fill_rate: 0.10
+  limit_miss_rate: 0.20
+  monte_carlo_runs: 500

@@ -1,3 +1,93 @@
+## 2026-09-11 (aao) OPERATION SHORT: a second, deliberately conservative short-biased system — and the 20-point scoring component that was STRUCTURALLY UNREACHABLE
+
+**Eamon, 10-Sep: *"Please review and start operation short."*** `downtrend_ensemble_bot/`
+is an exchange-agnostic short-biased ensemble, built to a 30-section spec, and it is a
+DIFFERENT animal from `(aam)`'s Lighter-native sibling rather than a port of it: 1.5x
+leverage against 10x, 0.25% risk/trade, a score bar of 70 against 62, RR 1.8 against 1.4,
+plus three things the sibling has none of — breakdown/retest as a scored setup, a CUSUM
+change-point detector with hysteresis, and Monte Carlo trade-order reshuffling.
+**20 modules, 272 tests, 22 of 22 mutations killed.** No edge is claimed: the only data
+that ships is SYNTHETIC and every report says so.
+
+**THE FINDING THAT JUSTIFIES THE WHOLE COMPONENT CENSUS — a 20-point scorer that could
+never fire, and the arithmetic is one line.** `breakdown_component` took its support
+level as `rolling_min(lows, 20, end=i-1)` and then searched `[i-8, i)` for a close BELOW
+it. Those eight bars are INSIDE the twenty the minimum was taken over, and
+`close[j] >= low[j] >= min(lows over any window containing j)` — so the test could not
+pass. Not rarely: **never.** Measured on **400,000 random bar-sets obeying only
+`close >= low`: 0 hits.** It is the second-largest weight in a 100-point ensemble, it
+scored **0.00 on every one of 332 signals**, the score bar was never reached, and the
+book took **zero trades** while looking like a selective strategy. Corrected windowing
+(range formed on the bars BEFORE the break window) fires at **7.5%** — matching the
+theoretical base rate on the same bars — and the book then trades. **A component that
+returns 0.0 is byte-identical between "the market did not do this" and "this can never
+fire", and only the per-component census separates them** — the (lv) `{open: 0}` shape,
+found in a scorer instead of a sleeve.
+
+**FIVE MORE DEFECTS, each caught by the thing built to catch it rather than by re-reading:**
+* **A stop on the WRONG SIDE of its own entry.** `last_swing` returns the most recent
+  CONFIRMED pivot, and on a falling tape price routinely runs straight through it — so
+  the last swing LOW sits ABOVE the close. A long sized off it is stopped on the fill,
+  and `risk = abs(entry - stop)` is happily positive, so nothing upstream objects.
+  Measured on 8 of 8 seeds. Fixed in `build_stop` AND refused again in `build_plan`,
+  where a number becomes an ORDER.
+* **An `orders` INSERT one placeholder short of its own table** — every order write in
+  paper or live mode would have raised. Found by a test that drives every writer once;
+  all positional INSERTs are column-named now.
+* **The metric that reports a run could kill it.** `cagr` annualised a span of seconds,
+  sending the exponent to 3e7 and raising `OverflowError` from inside `metrics()`. A
+  floor (`MIN_ANNUALISE_DAYS`) now refuses rather than fabricating — and the sharper
+  half is a 1-day 10% gain, which annualises to 6e14% WITHOUT overflowing, so a
+  try/except would have masked nothing.
+* **A capability name is a string, and a typo answers False forever.** Callers asked for
+  `place_reduce_only_stop` (a method name) of adapters publishing `native_stop` (a
+  capability name), so EVERY plan carried "WARNING: the adapter reports NO native stop"
+  — including from the mock that fully supports one — and the live gate's
+  protective-exit lock was closed against an adapter that would have passed it. **A
+  warning that fires on everything is a warning the operator learns to ignore.**
+  `CAPABILITIES` is one vocabulary and an unknown name now RAISES.
+* **A loss with no matching entry record was invisible to the portfolio lockout** — the
+  restart case, where the entry list starts empty and the trades most likely to be going
+  wrong are exactly the ones that span a restart.
+
+**AND THE MUTATION HARNESS ITSELF WAS WRONG, which is the (po) shape at one more remove.**
+`shutil.move` carries the ORIGINAL file's mtime, which can be older than the `.pyc`
+written while the file was mutated — so Python reused the MUTATED bytecode and the
+harness graded stale code. It reported `restored: RED` on a clean tree, and re-grading
+after the fix turned two KILLED verdicts into SURVIVED. **A guard that verifies guards
+needs its own control.** Now 22/22, with the survivors covered by a swept property test
+rather than a lucky seed: removing EITHER stop-side guard alone survives (genuine
+defence in depth), removing BOTH reddens.
+
+**WHAT IT REFUSES, and the refusals are the deliverable:** unrestricted market orders
+(never emitted — the most aggressive build is a marketable limit with a slippage cap,
+and an unknown spread is never marketable); widening a stop (monotone toward the
+position on both sides — the spec's own short-trail formula was `max`, which is the LONG
+form, and is documented as a deliberate departure); carrying an unprotected position;
+blind retries of a signed order; emulating a missing venue feature; clamping an
+out-of-range setting (`validate()` REJECTS — clamping tells the operator nothing);
+and modifying an existing dashboard (`dashboard_safety` is a VERIFIER with no writer in
+it, and refuses outright when `/pnl.json` cannot be verified).
+
+**LIVE IS REFUSED BY SEVEN LOCKS OF DIFFERENT KINDS** — a config mode, two env vars, a
+human at a terminal, a soak report fingerprinted to THIS configuration, a clean venue
+reconciliation, and a protective-stop capability probe. Different kinds on purpose:
+three env vars would all fall to one careless `export`. There is no `--yes`. The one
+bypass (`PAPER_SOAK_OVERRIDE`) relaxes a single lock, is stamped in the gate's own check
+map and printed in the banner, so a bypassed soak can never look like a passed one.
+
+**MEASURED ON THE SHIPPED SYNTHETIC TAPE, and reported as what it is:** 8 trades,
++0.78%, and the robustness gate **REFUSES** it on four counts (underpowered at n=8, one
+market carries 109% of P&L, top-3 trades are 141% of profit, halves disagree). `backtest`
+exits **2** on a refusal so a CI job cannot go green on a configuration the gate
+rejected. Walk-forward over the example tapes: 2 folds, 1 traded, and the aggregate
+carries its own power caveat because `consistency 1.000` over one window reads like a
+result and is not one.
+
+**Also fixed, and it reaches `(aam)` too:** the root `.gitignore`'s `.env.*` rule was
+silently excluding every `.env.example` template, so `lighter_adaptive_ensemble_bots/`
+shipped without the file its README tells the reader to copy. One exception line, both
+packages.
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —
@@ -293,6 +383,7 @@ Instrument this pass: `scripts/golive_readiness.py::live_fillable`. Pinned by
 `tests/autonomy/test_live_fillable.py` (29 tests). Closes nothing carried —
 `(aaf)` closed `taker-random-entry-null-blocked-on-ci` last night; this closes
 the class that made it necessary.
+
 
 ## 2026-09-10 (aam) — TWO SHORT MIRRORS OF 👩 mum AND 🙏 avo, MEASURED AND BOTH REFUSED — AND THE ENSEMBLE SYSTEM THAT REFUSAL ARGUES FOR
 

@@ -1,0 +1,15 @@
+Rename or copy this file to `KILL_SWITCH` (no extension) to halt the system.
+
+While runtime/KILL_SWITCH exists:
+  * no new positions are opened, in any mode
+  * unfilled ENTRY orders are cancelled where it is safe to do so
+  * protective exits (stops and reduce-only targets) are LEFT IN PLACE
+  * existing positions are NOT force-closed
+
+Closing positions is `flatten`, which needs FLATTEN_CONFIRMATION=CLOSE_ALL_POSITIONS.
+That separation is deliberate: the kill switch is for "stop making it worse",
+not "get me out at any price", and the two are different decisions.
+
+The switch is checked before every entry decision and on every loop tick, so it
+takes effect within one cycle. Deleting the file re-arms entries; nothing
+resumes automatically while it is present.
