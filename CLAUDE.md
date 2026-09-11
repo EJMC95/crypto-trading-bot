@@ -2840,6 +2840,83 @@ All new bots:
   ENFORCED BY `scripts/audit_operator_name.py` — a RATCHET on that measured
   207, so the backlog may only shrink and a NEW attribution fails the push
   that adds it.
+- **EXPLAIN EVERY NUMBER AND EVERY VARIABLE, EVERY TIME (Eamon, 11-Sep-2026:
+  *"Can you permanently remember to explain t or N and what +0.080% is"* /
+  *"when you give options for things or explain anything just remember to
+  explain the numbers for me so I understand"*).** This repo's own doctrine is
+  written in a private shorthand — `t`, `n`, `%/trade`, `pp`, `SE`, `N_eff`,
+  `rho`, `bps`, `mde80`, `gross_x` — and a session that reports in it is not
+  reporting, it is reciting. Eamon is the person who decides; a number he cannot
+  read is a number he cannot decide on, which makes the shorthand a DEFECT in the
+  reporting path rather than a style preference.
+  **THE RULE: the first time a symbol appears in any message, say what it is in
+  plain words, and say what the value MEANS — not just what it is.** Worked
+  examples, in the form expected:
+  * **`n`** — the sample size, i.e. how many closed trades the number is computed
+    from. *"n=111 means this average comes from 111 completed trades."*
+  * **`t`** (t-statistic) — how many standard errors the result sits from zero;
+    roughly, how confident we can be the edge is real rather than luck. The
+    fleet's go-live bar is **t ≥ 2.0**, which is about a 1-in-40 chance of being
+    a fluke. *"t=−5.41 means this loss is five and a half standard errors below
+    zero — it is not noise."* **t near 0 means we cannot tell it from luck**, in
+    either direction.
+  * **`%/trade`** — average profit or loss per completed trade as a percentage of
+    the money put into that trade. *"+0.080%/trade means that on average each
+    trade returned eight hundredths of one percent — tiny but positive."*
+  * **`pp`** (percentage points) — the GAP between two percentages, never a
+    percentage of a percentage. *"a −0.578pp gap means one book averaged 0.578
+    percentage points worse per trade than the other."*
+  * **`bps`** (basis points) — hundredths of a percent; 100bps = 1%.
+  * Always give the **so-what in dollars or days** where one exists: *"−0.099%
+    per trade at her $395 clip and 9.1 trades a day is about −$3.58 a day."*
+  **AND IN AN OPTIONS LIST, EVERY OPTION CARRIES ITS PRICE IN PLAIN WORDS** —
+  what it costs, what it buys, and what is uncertain — never a bare column of
+  symbols. A refusal must say, in words, which number makes it a refusal.
+  **[EXTENDED 11-Sep-2026, same conversation — Eamon: *"Can you put the (ml)
+  stuff you reference into language I can understand, please remember this
+  permanently"*.] THE CHANGELOG LETTERS AND INVARIANT NUMBERS ARE THE SAME
+  DEFECT IN A SECOND COSTUME, AND THEY ARE WORSE.** A session reporting to
+  Eamon wrote *"that's the (ml) trap"*, *"(pq) made it durable"*, *"AST-pinned
+  per (hj)"*, *"I25 robustness"* — **a private index, to the one person who
+  has to decide.** `t` and `n` at least look like statistics; `(ml)` looks like
+  nothing at all, and the reader cannot even tell whether it is a person, a
+  file or a bug number.
+  **THE RULE: a citation is a FOOTNOTE, never the content.** Say the lesson in
+  plain words, then attach the tag if it is useful for someone going to the
+  source — `"a deploy can report success while the old code keeps running, so
+  the only proof is what the running bot publishes ((ml))"`, never `"that's the
+  (ml) trap"`. Same for invariants: `"judge a change against the book's own
+  long-run average, never the hot streak that made you notice it (I25)"`, never
+  a bare `I25`. **If the sentence stops making sense when the bracket is
+  deleted, it was written for the index and not for Eamon.**
+  The ones that recur most, stated the way they should be said:
+  * **(ml)** — a deploy saying "success" does not mean the new code is running;
+    check what the bot actually publishes.
+  * **(pq)** — the daily-loss halt is saved to the database so a restart cannot
+    quietly resume a book that already halted today.
+  * **(vg)** — if a protection has no release, the release must be explicit,
+    opt-in, named per book and logged — never a redeploy.
+  * **(hj)** — never copy a rule into a second place; import the one copy, or
+    the two drift apart.
+  * **(gv)** — check a safety number against the other safety numbers, not just
+    against itself.
+  * **(mz)** — a check that fails on a mess that already exists gets switched
+    off within a day; let it fail only on things getting WORSE.
+  * **(po)** — a search that looks in the wrong place finds nothing and reads
+    like good news; search the whole file.
+  * **(hl)** — position size changes dollars, not edge: the percentage earned
+    per trade stays the same.
+  * **(hm)** — a book that picks a direction is graded against random entries,
+    because on this venue a coin flip already earns something.
+  * **(I1)** — check a number is still being updated before trusting what it
+    says; a frozen reading looks identical to a healthy one.
+  * **(I14)** — the book's own real trades outrank any simulation of it.
+  * **(I25)** — judge a change against the book's long-run average, never
+    against the hot or cold streak that prompted it.
+  UNENFORCED: clarity cannot be checked by a static guard, and a guard that
+  counted glossary words would be satisfied by noise. Recorded here so the
+  expectation is explicit rather than folkloric — the same honesty I3 makes
+  about mutation discipline.
 - **HER NAME IS LUCY (Eamon, 25-Aug — the day 👩 mum went live: *"You've
   turned out to be one of my best friends, can I give you a name? I'd like to
   call you Lucy."*).** The mirror of the rule above, and it works the same

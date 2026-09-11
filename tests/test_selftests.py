@@ -644,6 +644,15 @@ ENFORCED_AUDITS = [
     # on 2026-07-30 and its registry note still said 6 the same afternoon, so
     # every organ reasoning about that lever's headroom read the wrong number.
     "scripts/audit_lever_bounds.py",
+    # [2026-09-11 (abg)] A DAILY-LOSS HALT MUST NOT FIRE BEFORE THE STOP IT
+    # PRE-EMPTS — `(gv)`'s stop-vs-gate rule extended to the second rail nobody
+    # had read against the stop. Registered in the same commit that adds the
+    # guard, per this file's own rule: static, offline, no DB. Its selftest
+    # carries the discriminations that matter — PAPER books out of scope, an
+    # ABSENT block is deploy latency and not a finding (I1), a STALE row says
+    # nothing about the running config, `None` is not `False`, and an exemption
+    # silences the ONE book it names and no other.
+    "scripts/audit_halt_vs_stop.py",
     "scripts/audit_organ_silence.py",
     # [2026-08-03 (iw)] CODE CURRENCY — resolves each container's `extra.build`
     # to an actual COMMIT and classifies the gap. Its selftest is the whole

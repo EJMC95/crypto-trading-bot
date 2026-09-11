@@ -166,6 +166,17 @@ jobs:
         if: ${{ !cancelled() && steps.feed.outcome == 'success' }}
         run: python3 scripts/audit_live_roster.py --pnl-json pnl.json
 
+      # [2026-09-11 (abg)] THE SCAN ARM of the halt-vs-stop guard. Registered in
+      # `tests/test_selftests.py` too, but that runs its FIXTURES — the arm that
+      # catches a real book is this one, pointed at the live feed, and a guard
+      # whose only exercise is its own fixtures is the (gk)/(ox) shape ("the rule
+      # nobody runs"). Placed here because this job already fetches the feed and
+      # already treats a dark one as failure, and gated on the FEED's outcome per
+      # (aaz) — a red guard above must not silence this one.
+      - name: Does any live book's daily halt pre-empt its own stop?
+        if: ${{ !cancelled() && steps.feed.outcome == 'success' }}
+        run: python3 scripts/audit_halt_vs_stop.py --pnl-json pnl.json
+
       # [2026-08-16 (pb)] CI COVERAGE — the two workflows disagree about a
       # burst of pushes and the disagreement is silent: Tests cancels
       # in-progress runs, Railway Redeploy does not. Measured 16-Aug over 4
