@@ -115,6 +115,121 @@ independently priced across all 14 books. Without it I would have shipped the
 precondition. That is the third time today an adversarial pass reversed a
 conclusion I had already reasoned my way to.
 
+## 2026-09-11 (aaw) — THE DRAWDOWN BAR DIVIDES A 10-SEP HOLE BY AN 11-SEP DEPOSIT, AND THE STOP-DEATH PAGER READS A CEILING THE CLIP HAS NOT USED SINCE (vy) — two numbers published beside the ones that are wrong, nothing switched
+
+**Eamon, 11-Sep:** *"do you have any suggestions regarding 1 and 2"*, then
+*"proceed and implement the above, hold off on avo untill her trades are
+empty"*. Both halves shipped as PUBLISH-BESIDE, and **🙏 avo's service was
+deliberately not deployed** — she held 6 positions, so the marker is
+`[deploy-live-mum]` alone and her container keeps running the build it has.
+
+**1 · THE MAXDD BAR'S NUMERATOR AND DENOMINATOR ARE DIFFERENT OBJECTS.**
+`mtm_drawdown` finds the max dollar hole against a RUNNING peak (L1889-1893)
+and divides it by the GLOBAL peak (L1895/L1924), and `apply_mtm` makes that
+field THE BAR while `fleet_bus.dd_scale` reads it to size live clips. On a
+series that later exceeds the peak the hole opened at — **every book that took
+a deposit** — it understates. Measured across all 35 live equity series:
+
+| book | shipped | running-peak | |
+|---|---|---|---|
+| 🙏 avo LIVE | 12.32% | **24.09%** | PASS -> FAIL at the 15% bar |
+| 👩 mum LIVE | 9.90% | **13.05%** | |
+| 🎫 taker shadow | 4.77% | 4.88% | max-% vs max-$ EPISODE |
+| 🌾 carry shadow | 1.75% | 1.81% | |
+| 📊 equities-regime | 0.36% | 0.36% | |
+| the other 30 | — | identical | |
+
+**THE FLEET ALREADY HELD THE RIGHT IMPLEMENTATION AND IT WAS NOT THE ONE
+HOLDING THE GUN:** `pnl_dashboard._max_drawdown_pct` (:6716) has walked
+`min(dd, v/peak - 1.0)` — a running peak on both sides — since the 15-Jul
+salvage. This is "a second copy of a rule is a second rule" with the wrong copy
+governing real money.
+
+**SHIPPED: `max_dd_frac_runpeak` / `runpeak_at` / `runpeak_denom_usd`, REPORTED
+AND NEVER A BAR** — `apply_mtm`, `grade` and `bar_map` are byte-unchanged and a
+test pins that. **The second site was the one that mattered:** `book_payload`
+rebuilds a hand-picked whitelist rather than serialising `mtm`, so a field added
+to `mtm_drawdown` alone is **born dark in the payload**, and
+`test_the_field_actually_reaches_a_reader` keeps that closed.
+
+**WHY IT WAS NOT SWITCHED, which is the substance rather than caution.**
+Switching fails BOTH real-money books and cuts their clip through `dd_scale`
+(avo 24.09% -> scale 0.545, deployed $969.82 -> $528.8). And avo's reading is
+**confounded**: her worst window (22-24 Aug, -$55.65) contains **ZERO bot P&L**
+— 7 closes, all `long_daily_loss` halt events at $0.00 — beside **$66.40 of
+attested operator manual trades** (`MANUAL_PNL_USD`, (td)) that sit in the
+equity series because `snapshot_equity` writes raw venue equity. **Stated
+against the first draft of this entry, which said the drawdown "is not the
+bot's": that is too generous.** Attributing the $66.40 uniformly reads
+**33.81%**, so the confound interval is 24.09%-33.81% and she is past the bar
+at BOTH ends; what is unresolved is the SIZE, not the verdict. **Only Eamon can
+close it** — the dates those trades were taken. 👩 mum's 13.05% is unambiguously
+hers (66 closes, -$65.92, `manual_pnl_usd` 0.0).
+
+**REFUSED, with the number:** reader-side deposit detection. This session's own
+measurement used jump-matching, and it is **measurably wrong in the loosening
+direction** — on 🪁 kelly it invents two phantom flows and would BUY her 51%
+more clip. The flow must be attested at the PUBLISHER; that is the next step,
+and it is forward-only, so it is not in this commit.
+
+**2 · THE STOP-DEATH PAGER READS THE CLIP-OFF CEILING.** `stop_dead_above`
+4.17x is `1/(|stop| + worst_mmf)` with the per-coin mmf clip DISENGAGED, and
+`mmf_clip_factor` has scaled the high-margin coins since (vy) precisely so the
+stop survives. So `protective stop is DEAD at gross 9.5 (ceiling 4.17)` — which
+fired on **~14.5 of ~99 immune cycles** the day mum went to 9.5x — is true at
+ANY gross above 4.17: **I7's trigger met by configuration.** The number that
+actually bound her was published NOWHERE.
+
+**THE CLOSED FORM, and it is the shipped clip's own arithmetic rather than a
+second copy of it.** `mmf_clip_factor` scales by `(sl+REF)/(sl+mmf)` exactly
+where the stop would die, which EQUALISES maintenance-per-deployed-dollar at
+`MMF_CLIP_REF` for every tier at or above it, so the whole family collapses:
+
+    G_dead = 1 / (|stop| + min(mmf, MMF_CLIP_REF))
+
+For mum: **10.0000x nominal · 9.5066x at her measured `overshoot_p90_bps` 51.9
+· 9.4127x at worst observed 62.4**. She is set to 9.5 — headroom **+0.0066x**.
+Pinned by brute-forcing the SHIPPED `mmf_clip_factor` over uniform and mixed
+12-leg baskets, so the form cannot drift from the function it summarises; the
+counter-intuitive half is that the binding basket is the **43 coins at exactly
+600bps** (f=1.0 at every gross), not the 20% tier.
+
+**SHIPPED:** `stop_dead_above_eff` (all three bases), `stop_ceiling_basis`,
+`stop_reachable_eff`, `gross_x_headroom`, `gross_x_max_env`,
+`gross_x_max_alive`; the pager reads the clip-ON verdict when present and keeps
+the old reading otherwise so nothing goes quiet in the deploy window; and **a
+DARK margin read stops being silent** — every limb fired only on `is False`, so
+when `fleet_bus.market_margins()` is empty every verdict degrades to None and
+the organ said nothing, on precisely the state where `mmf_clip_factor` ALSO
+stops protecting. Gated on a levered book: at 1x the question does not arise.
+
+**FAIL-CLOSED ON THE UNKNOWN (I1/I8):** `clipped_stop_ceiling(None)` returns
+None and never the closed form — the formula needs no margin map, so computing
+it anyway would turn a dark read into an affirmative green on a levered
+real-money row.
+
+**REFUSED:** adding `stop_dead` to `fleet_immune.HEADROOM_OK` to quiet the
+page. It silences the structural false positive AND the true positive
+underneath it, and an exemption granted to quiet a pre-existing alarm is how a
+guard stops guarding. **NOT REBUILT:** `(aas)` had already silenced the FLAT
+case hours earlier via `_book_flat`; this builds on it rather than redoing it.
+**NOT CLAMPED:** `GROSS_X_MAX` stays Eamon's env — published beside the derived
+ceiling, never overridden ((sr)/(tg)).
+
+**Enforcement:** `tests/autonomy/test_clipped_stop_ceiling.py` (17 tests) and
+`tests/autonomy/test_runpeak_drawdown.py` (6). Mutations: **7/7 red** across the
+two modules after one survivor was removed as REDUNDANT CODE rather than
+covered — an `and _eff is None` clause the `elif` chain already guaranteed,
+which no test could ever kill, replaced by a test that pins the branch ORDER.
+One further survivor is recorded as a **no-op by proof** (substituting
+`abs(dd)/peak` for `_r` at the update site is identical because `peak` is
+monotone; verified over 200,000 random series, zero counterexamples) so a
+future session does not chase it. Two fixture defects were caught by their own
+tests failing loudly: a margin map written `{"mmf": m}` where the venue's shape
+is `{"mmf_bps": ...}` (every leg silently degraded to `MMF_CLIP_UNKNOWN`), and
+a hand-rolled `stats` sample chased KeyErrors one field at a time until it was
+replaced by a publisher-built one.
+
 ## 2026-09-11 (aar) — 🎫 THE NULL THAT BLOCKED A GO-LIVE INFERRED SIDE FROM A NULLABLE COLUMN, AND REPLAYED 7 LONGS AS SHORTS
 
 **The instrument whose verdict refused the taker's go-live had a sign bug in

@@ -696,6 +696,7 @@ def headroom_sickness(bot_rows, ok=None):
         # venue's own leverage) that is the verdict; a row that has not yet
         # deployed it keeps the old read, so nothing goes quiet in the window.
         _held = lev.get("stop_reachable_held")
+        _eff = lev.get("stop_reachable_eff")
         if _held is not None:
             if _held is False and "stop_dead" not in allowed:
                 out.append({"organ": bot,
@@ -704,17 +705,72 @@ def headroom_sickness(bot_rows, ok=None):
                                       f"(ceiling {lev.get('stop_dead_above_held')}, "
                                       f"mmf_held {lev.get('mmf_held')}) — "
                                       f"liquidation fires before the stop"})
+        # [(aau)] THE CLIP-ON VERDICT SITS BETWEEN THE HELD MEASUREMENT AND
+        # THE CLIP-OFF BOUND. `stop_reachable` below is computed with the
+        # per-coin mmf clip DISENGAGED, so on a levered book it is False by
+        # CONFIGURATION — I7's "a trigger a book satisfies structurally is
+        # not a measurement". Measured 11-Sep: it read `DEAD at gross 9.5
+        # (ceiling 4.17)` for 👩 mum while her clip-ON ceiling was 10.0x and
+        # her real headroom +0.0066x. `(aas)` silenced the FLAT case; this
+        # gives the held case the right NUMBER rather than the clip-OFF one.
+        # An allowlist entry was refused instead: `stop_dead` in HEADROOM_OK
+        # would also blind this limb to a genuinely dead stop.
+        elif (_eff is not None and "stop_dead" not in allowed
+              and not _book_flat(r, lev)):
+            if _eff is False:
+                out.append({"organ": bot,
+                            "detail": f"protective stop is DEAD at gross "
+                                      f"{lev.get('set')} with the mmf clip "
+                                      f"ENGAGED (ceiling "
+                                      f"{lev.get('gross_x_max_alive')} on the "
+                                      f"{lev.get('stop_ceiling_basis')} stop, "
+                                      f"headroom {lev.get('gross_x_headroom')})"
+                                      f" — liquidation fires before the stop"})
         elif (lev.get("stop_reachable") is False
               and "stop_dead" not in allowed
               # [(aas)] ...and the book actually holds something. See
               # `_book_flat` above: the bound describes a basket, so an empty
               # book cannot fail it.
+              # [(aau)] Reaching this limb already IMPLIES `_eff is None`:
+              # the clip-ON branch above claims every row that publishes it,
+              # and its two escapes (`stop_dead` allowed, book flat) are both
+              # re-tested here. An explicit `and _eff is None` was written,
+              # then REMOVED when a mutation could not redden it — a clause
+              # no test can kill is the vacuous guard this file warns about.
+              # The ORDERING is what carries the property, and
+              # `test_a_row_with_the_clip_on_verdict_never_reports_the_clip_off_ceiling`
+              # pins it.
               and not _book_flat(r, lev)):
             out.append({"organ": bot,
                         "detail": f"protective stop is DEAD at gross "
                                   f"{lev.get('set')} (ceiling "
                                   f"{lev.get('stop_dead_above')}) — "
                                   f"liquidation fires before the stop"})
+        # [(aau)] AND AN UNKNOWN MUST NOT READ HEALTHY (I1/I4). Every limb
+        # above fires only on `is False`, so when `fleet_bus.market_margins()`
+        # is dark EVERY stop verdict degrades to None and this organ went
+        # SILENT — on precisely the state that means "I cannot tell whether
+        # the stop works", while `mmf_clip_factor` simultaneously stops
+        # protecting (a dark map returns factor 1.0). Gated on a LEVERED book:
+        # at 1x the question does not arise, and an organ outage must not page
+        # an unlevered row. NOT gated on `_book_flat` — a dark margin read is
+        # a property of the FEED, not of the basket, so a flat book with a
+        # dark map is still a book whose next entry is sized blind.
+        if (_held is None and _eff is None
+                and lev.get("stop_reachable") is None
+                and lev.get("mmf") is None
+                and "stop_dark" not in allowed):
+            try:
+                _g = float(lev.get("set") or 1.0)
+            except (TypeError, ValueError):
+                _g = 1.0
+            if _g > 1.0:
+                out.append({"organ": bot,
+                            "detail": f"margin read is DARK — cannot tell "
+                                      f"whether the protective stop is alive "
+                                      f"at gross {lev.get('set')}; the mmf "
+                                      f"clip is NEUTRAL while the map is "
+                                      f"empty, so sizing is unprotected"})
     return out
 
 

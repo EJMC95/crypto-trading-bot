@@ -611,6 +611,74 @@ def stop_reachable(mmf, gross=None):
     return (sl < (1.0 / g - mmf) - 1e-9) if g and g > 0 else None, ceiling
 
 
+def stop_bases(ov, stop=None):
+    """The stop widths this book's fills ACTUALLY realise, as fractions.
+
+    -> {"nominal": |stoploss|, "measured_p90": .., "measured_worst": ..} with
+    the measured pair ABSENT below `OVERSHOOT_MIN_N` — a thin overshoot sample
+    may not name itself "measured" (the `_honest_stop_cost` rule, same floor,
+    same reason). A NEGATIVE overshoot is a fill BETTER than the level and
+    floors at the level: it does not earn leverage.
+    """
+    sl = abs(float(S.stoploss)) if stop is None else abs(float(stop))
+    out = {"nominal": sl}
+    try:
+        vals = [float(v) for v in ((ov or {}).get("vals") or [])]
+        if vals and int((ov or {}).get("n") or 0) >= OVERSHOOT_MIN_N:
+            p90 = sorted(vals)[max(0, int(round(0.9 * len(vals))) - 1)]
+            out["measured_p90"] = sl + max(0.0, p90) / 1e4
+            out["measured_worst"] = sl + max(0.0, max(vals)) / 1e4
+    except (TypeError, ValueError):
+        pass
+    return out
+
+
+def clipped_stop_ceiling(mmf, stop=None):
+    """The gross at which the protective stop dies WITH the per-coin mmf clip
+    ENGAGED — i.e. the number that actually binds on this book.
+
+    [2026-09-11 (aau)] `stop_dead_above` beside it is the clip-OFF bound, and
+    on a levered book it is neither what governs nor what the operator can act
+    on. It reads 4.17x for mum while her clip-ON ceiling is 10.0x, so it is
+    "DEAD" at every gross above 4.17 — a condition met by CONFIGURATION, which
+    is I7's "a trigger a book satisfies structurally is not a measurement".
+    Measured the day this shipped: that page fired on ~14.5 of ~99 immune
+    cycles while her REAL headroom, +0.0066x at her own measured slippage, was
+    published nowhere.
+
+    THE CLOSED FORM, and it is the shipped clip's own arithmetic rather than a
+    second copy of it. `mmf_clip_factor` scales a coin by
+    `(sl + MMF_CLIP_REF) / (sl + mmf)` exactly when the stop would otherwise
+    die, so maintenance-per-deployed-dollar is EQUALISED at `MMF_CLIP_REF` for
+    every tier at or above it, and the ceiling collapses to a single value:
+
+        G_dead = 1 / (|stop| + min(mmf, MMF_CLIP_REF))
+
+    Verified by brute-forcing the shipped `mmf_clip_factor` over uniform and
+    mixed 12-leg baskets at mum's 4% stop: tiers 0.06 / 0.075 / 0.12 / 0.20 /
+    0.30 and the mixed 8x0.20+4x0.12 all return 10.0000x, and the sub-REF tiers
+    return `1/(sl+mmf)` unchanged (0.012 -> 19.2308x, 0.03 -> 14.2857x).
+
+    FAIL-CLOSED ON AN UNREADABLE MARGIN (I1/I8). `mmf is None` returns None and
+    never the closed form: the formula needs no margin map, so computing it
+    anyway would turn a DARK read into an affirmative green on a levered
+    real-money row — an unknown that reads healthy is the failure this
+    invariant exists for. Reported, never a gate: it clamps nothing.
+    """
+    if mmf is None:
+        return None
+    try:
+        sl = abs(float(S.stoploss)) if stop is None else abs(float(stop))
+        eff = min(float(mmf), MMF_CLIP_REF) if MMF_CLIP_SCALE else float(mmf)
+    except (TypeError, ValueError):
+        return None
+    denom = sl + eff
+    if not denom > 0:
+        return None
+    out = 1.0 / denom
+    return round(out, 4) if math.isfinite(out) else None
+
+
 def vol_target_gross_x(n_eff=1.0):
     """Gross that keeps an all-slots-stop inside the 15% go-live drawdown bar,
     credited for measured independence. n_eff=1 (fully correlated) returns the
@@ -2144,6 +2212,29 @@ def main(_ctx=None, once=False):
             _stop_ok_held, _stop_ceiling_held = (
                 stop_reachable(_held_mmf, _lev_now)
                 if (_held_mmf is not None and _lev_now) else (None, None))
+            # [(aau)] THE CEILING THE CLIP ACTUALLY ENFORCES, at every stop
+            # basis this book can evidence. `_stop_ceiling` above is the
+            # clip-OFF bound and is structurally exceeded on any levered
+            # book (I7); this is what binds. None throughout on a dark
+            # margin read — the closed form needs no map, so computing it
+            # anyway would publish a green from an unknown (I1).
+            _eff_ceilings, _eff_basis, _eff_ok, _eff_headroom = {}, None, None, None
+            if _mmf is not None:
+                for _b, _sl in stop_bases(ov).items():
+                    _c = clipped_stop_ceiling(_mmf, _sl)
+                    if _c is not None:
+                        _eff_ceilings[_b] = _c
+                # the MEASURED basis governs when the sample supports one;
+                # otherwise the nominal bound, named so no reader infers
+                # measurement that was not made.
+                for _b in ("measured_p90", "nominal"):
+                    if _b in _eff_ceilings:
+                        _eff_basis = _b
+                        break
+                if _eff_basis:
+                    _g = gross_x()
+                    _eff_headroom = round(_eff_ceilings[_eff_basis] - _g, 4)
+                    _eff_ok = _g < _eff_ceilings[_eff_basis] - 1e-9
             payload = {
                 "venue": "lighter_live", "style": S.style, "family": True,
                 # [2026-08-25] derived from the variant — this was a hardcoded
@@ -2280,6 +2371,23 @@ def main(_ctx=None, once=False):
                     # protective stop is dead code. Reported, never a gate.
                     "stop_reachable": _stop_ok,
                     "stop_dead_above": _stop_ceiling,
+                    # [(aau)] ...and the SAME question with the per-coin mmf
+                    # clip engaged, which is the one that governs. Three
+                    # bases: the nominal stop, and — only when the overshoot
+                    # sample clears OVERSHOOT_MIN_N — where this book's fills
+                    # actually land. `stop_ceiling_basis` names which one
+                    # `stop_reachable_eff` was decided on, so a reader never
+                    # infers a measurement that was not made.
+                    "stop_dead_above_eff": (_eff_ceilings or None),
+                    "stop_ceiling_basis": _eff_basis,
+                    "stop_reachable_eff": _eff_ok,
+                    "gross_x_headroom": _eff_headroom,
+                    # what the operator set, beside what the stop supports —
+                    # published, never clamped ((sr)/(tg): a cap's VALUE is
+                    # the operator's; the code's job is the arithmetic).
+                    "gross_x_max_env": GROSS_X_MAX,
+                    "gross_x_max_alive": (_eff_ceilings.get(_eff_basis)
+                                          if _eff_basis else None),
                     # [(wp)] THE HELD-BASKET MEASUREMENT beside the bound.
                     # `mmf`/`liq_gap_pct`/`stop_reachable` above are the
                     # universe-worst margin at FULL-slot gross — a ceiling

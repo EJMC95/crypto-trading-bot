@@ -2185,9 +2185,26 @@ def mtm_drawdown(samples, book_usd=None):
     book_usd = BOOK_USD if book_usd is None else book_usd
     peak = pts[0][1]
     dd = 0.0
-    for _, eq in pts:
+    # [2026-09-11 (aau)] ...and the RUNNING-PEAK RATIO, in the same pass.
+    # `max_dd_frac_peak` below divides this loop's running-peak dollar hole by
+    # the GLOBAL peak — numerator and denominator are different objects, and
+    # on a book whose equity later exceeds the peak the hole opened at (every
+    # book that took a DEPOSIT) it understates. `runpeak` is the textbook
+    # definition, the same one `pnl_dashboard._max_drawdown_pct` has always
+    # used, and it is the MAX OF THE RATIO rather than the ratio of the max-$
+    # hole: those pick different episodes (measured across all 35 live series
+    # they differ on 🎫 taker-lshadow, 4.879% vs 4.769%, in the WORSE
+    # direction, on the fleet's first READY book).
+    runpeak = 0.0
+    runpeak_at = None
+    runpeak_denom = None
+    for ts, eq in pts:
         peak = max(peak, eq)
         dd = min(dd, eq - peak)
+        if peak > 0:
+            _r = (peak - eq) / peak
+            if _r > runpeak:
+                runpeak, runpeak_at, runpeak_denom = _r, ts, peak
     days = (pts[-1][0] - pts[0][0]).total_seconds() / 86400.0
     peak_eq = max(e for _, e in pts)
     return {"n": len(pts), "days": days,
@@ -2219,6 +2236,18 @@ def mtm_drawdown(samples, book_usd=None):
             # handed already contains its own peak. None when that peak is
             # non-positive, never 0.0 (I8: unknown degrades to unknown).
             "max_dd_frac_peak": (abs(dd) / peak_eq) if peak_eq > 0 else None,
+            # [(aau)] REPORTED, NEVER A BAR — `apply_mtm`, `grade` and
+            # `bar_map` are byte-unchanged by this commit, exactly as (kw) put
+            # `cluster` beside `t` and (yr) put `max_dd_frac_peak` beside the
+            # $1,000 reading. Switching onto it fails BOTH real-money books
+            # (mum 9.90 -> 13.05, avo 12.32 -> 24.09) and cuts their clip
+            # through `fleet_bus.dd_scale`, so it is an operator decision taken
+            # on a published readback, not a side effect of a correctness fix.
+            # None (never 0.0) when no sample had a positive peak — I8.
+            "max_dd_frac_runpeak": (runpeak if runpeak_at is not None
+                                    else None),
+            "runpeak_at": runpeak_at,
+            "runpeak_denom_usd": runpeak_denom,
             "first_equity": pts[0][1], "last_equity": pts[-1][1],
             "peak_equity": peak_eq}
 
@@ -3547,6 +3576,17 @@ def book_payload(s):
             "max_dd_pct_peak": (round(100 * _m["max_dd_frac_peak"], 2)
                                 if _m.get("max_dd_frac_peak") is not None
                                 else None),
+            # [(aau)] the running-peak reading, published so the size of the
+            # correction is visible BEFORE anything acts on it. `book_payload`
+            # rebuilds a hand-picked whitelist rather than serialising `mtm`,
+            # so a field added to `mtm_drawdown` alone would never reach a
+            # reader — born dark in the payload instead of the import graph.
+            "max_dd_pct_runpeak": (round(100 * _m["max_dd_frac_runpeak"], 2)
+                                   if _m.get("max_dd_frac_runpeak") is not None
+                                   else None),
+            "runpeak_denom_usd": (round(_m["runpeak_denom_usd"], 2)
+                                  if _m.get("runpeak_denom_usd") is not None
+                                  else None),
             "last_equity": _m.get("last_equity"),
             "peak_equity": _m.get("peak_equity")}
     if s.get("max_dd_frac_realised") is not None:
