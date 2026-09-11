@@ -82,6 +82,115 @@ Both are CARRIED (`null-basis-and-window-mismatch`) rather than patched in the
 same pass — one surface per pass, verified in the live payload, which is the
 rule `(fz)` was written to enforce.
 
+## 2026-09-11 (aat) — 👩 MUM'S GROSS 5.0x → 9.5x, NOT THE 9.6x ASKED FOR: HER STOPS DIE AT 9.507x, AND THE BINDING BASKET IS THE ONE TIER HER OWN CLIP NEVER SCALES
+
+**Eamon, 11-Sep: *"Adjust mums sizing to her new balance which i just
+deposited"*, then *"change her back to 9.6"*.** He deposited **$265.44** into
+her live arm while she was FLAT (equity 515.13 → 780.57 at 00:36:41Z,
+`capital_adjust` 220.42 → 485.86, `pnl_abs` invariant at −5.29 across the
+boundary — the guard booked it correctly).
+
+**THE SIZING ASK WAS ALREADY SATISFIED, AND THAT IS THE FINDING.** `clip =
+equity × gross_x / max_open` re-derives from a fresh venue equity read every
+loop (`clip_usd`, :799-804, called at :3161), so the deposit had already flowed
+through before he asked: 780.569717 × 5.0 / 12 = **$325.24**, matching the
+published row to 8 significant figures, and `deployed_at_full` 3902.85 pins the
+unrounded clip while simultaneously proving `_clip_scale_now()` is 1.0. The
+notional cap auto-tracks too (`cap_src: "scaled"`, `cap = max(env_floor, equity
+× gross × 1.05)`), so `cap_slots` is 12 = `max_open` and the (sr)
+**deposit-buys-fewer-bets** class is structurally unreachable while scaling is
+on — cap/clip ≡ 12.6 at any equity. `FREQTRADE_MUM_MAX_NOTIONAL=3000` is now a
+FLOOR the scaled cap has outgrown; **that switch is load-bearing for her slot
+count and nobody had recorded it.**
+
+**EXACTLY ONE QUANTITY IS A FIXED DOLLAR AND MOVED WITHOUT BEING CHOSEN:**
+`LIGHTER_MAX_DAILY_LOSS = $105` (`venues/safety.py:93`, unprefixed → per
+service; avo's is $80). It is **$105 = 20% of $525**, her day-start on 3-Sep —
+a frozen snapshot of the 20% leash `MUM_DAILY_LOSS=0.20` expresses. Measured
+across her day-starts: the pct rail bound through 3-Sep, the **abs cap has bound
+since 4-Sep** (19.9% → 18.1% → 19.5%), and the deposit **deepened an
+already-binding rail** to **13.45%**. Corrected in place against the first
+reading of this pass, which said the deposit *created* the bind: it did not.
+NOT MOVED — a cap change is a value decision and the (wh)→revert record is
+explicit that the abs cap is a deliberate tighter fleet rail, with the VALUE
+"presented to Eamon, not a code fix".
+
+**THE GROSS: 9.6 WAS ASKED FOR, 9.5 SHIPPED, AND THE 0.1 IS A MEASURED SAFETY
+PROPERTY.** With `x(G) = 12/(G·Σf) − Σfm/Σf` over the module's own
+`mmf_clip_factor`, the worst achievable 12-leg basket is **NOT** the high-margin
+one — the clip scales those. It is the **43 coins at exactly 600bps**, because
+600bps **IS** `MMF_CLIP_REF`, so `f = 1.0` at every gross and they carry the most
+maintenance margin per deployed dollar: `x(G) = 1/G − 0.06`. Against her own
+`overshoot_p90_bps` **51.9** (stop fills at 4.519%, not 4.000%):
+
+| gross | liquidation at | nominal 4.000% | p90 4.519% | worst 4.624% |
+|---|---|---|---|---|
+| 9.4x | 4.638% | ALIVE | ALIVE | ALIVE |
+| **9.5x** | **4.526%** | ALIVE | **ALIVE** | DEAD |
+| 9.5066x | 4.519% | ALIVE | tie | DEAD |
+| 9.6x | 4.417% | ALIVE | **DEAD** | DEAD |
+
+**At 9.6x the venue liquidates before her stop fills** on that basket. Ceilings:
+`1/(stop+0.06)` = **10.0000x** nominal, **9.5066x** at p90, **9.4127x** at worst
+observed. Shipped **9.5** — inside the p90 ceiling, 1% off the ask — and put the
+three numbers to Eamon, who chose it. **The row does NOT publish this**:
+`stop_dead_above` 4.17 is the clip-OFF per-coin figure; the overshoot-aware
+CLIPPED basket ceiling is what governs and is unpublished. CARRIED.
+
+**PRICED (I19):** per-trade % is clip-invariant ((hl)), so gross moves dollars
+and not edge. At 9.5x on $780.57: clip **$617.95**, gross **$7,425**,
+all-slots-stop **38%** = $296.62 nominal / 43% = $335 at measured overshoot —
+but the **$105 halt fires first, at a 1.40% basket move**, 3.2x before the
+4.53% liquidation point. Measured against her 13 real trading days at their
+OWN gross, a $105 cap at this leverage would have fired on **1 of 13 days**
+(9-Sep only) — it is her binding protection at this gross, not a nuisance.
+Era NOT reset: a clip change is (hc) ordinary tuning. Shipped while she was
+**FLAT and slguard-locked until 04:01:40Z**, the (px) empty-book boundary, so
+no legacy-clip transient. Verified on the row: `gross_x` 9.5, clip 617.95, cap
+7786, `cap_slots` 12, deployment `606b2ad7` SUCCESS. Reverts: `MUM_GROSS_X`.
+
+**AND THE QUESTION UNDERNEATH IT — "they were winning and now they're losing"
+— IS ANSWERED NO, AGAINST A CONTROL ARM.** BTC fell **−4.66%** and SOL
+**−7.32%** 6→10 Sep. Both shadow twins, which take none of the live-arm
+changes, turned down in the same window (mum −1.71%, avo −2.22% peak-to-now).
+Paired on the same coin and close-day, mum's live arm differs from her twin by
+**+0.013pp (t=+0.11, n=77)**; on all matched pairs at wider windows it is
+−0.193pp at **t=−1.33** — not distinguishable from zero in either form, so the
+honest statement is **no measurable edge decay**, not "identical". Her sd(%/
+trade) is **1.09x** the twin's while her sd($/trade) is **4.59x**, tracking the
+clip ratio 4.86x: **the variance is the clip, the edge is unchanged.** The
+leverage residual (live% − twin%·gross) is **−0.605pp/day, t=−0.99** over 9
+days. Her own matched-random control leg lost **1.248%/trade** in the same
+window — the regime, from a third independent direction. **Her gross was
+9.6-9.9x during the winning stretch** (28-Aug–1-Sep, from her own stamped
+clips), cut to 3.73x at (xf) on 3-Sep and set to ~5.0x on 4-Sep — **four days
+before the turn**, so the change moved her exposure DOWN and roughly halved
+what the drawdown cost. **DECLARED, against the first draft of this entry:**
+I25's fleet-wide hot-window reversion is NOT confirmable on her 118-close
+ledger in either direction and is not cited here — the TWIN is the
+counterfactual, which is what I25 actually requires.
+
+**🙏 AVO IS NOT LOSING AND THE ROW SAYS SO:** realised **+$120.99** over 18
+graded closes at an all-time high, unchanged in 56.5h because she has closed
+nothing; open basket **−$17.77** unrealised at live marks (3 independent
+derivations agree within $1.17); bot net **+$102.08**, exactly her published
+`pnl_abs`. Her 27-vs-18 ledger gap is **exactly the 9 zero-basis halt-event
+rows** of 23/24-Aug (the memory class), not quarantine or era. Paired against
+her twin she is **+0.975pp/trade better (t=+1.38)**.
+
+**TWO REAL-MONEY FINDINGS CARRIED, both found by the verification pass:**
+(1) **the go-live maxdd bar divides by the GLOBAL peak, not the running peak at
+which the hole opened** (`golive_readiness.py:2121`), so on a book that took a
+deposit DURING a drawdown it understates ~2x — avo's deciding drawdown reads
+**12.32%** and was **24.09%** when it happened ($55.65 from a running peak of
+$231.02, against a global peak inflated by two deposits). It is verdict-level:
+`bars.maxdd` flips True→False, and `fleet_bus.dd_scale` reads that exact field,
+so her live clip rail would fall 1.0 → 0.545. (2) **a dark margin bus turns the
+mmf clip OFF and nulls the pager** — `mmf_clip_factor` returns 1.0 on an empty
+map and `headroom_sickness` fires only on `is False`, so both-None is silent;
+measured exposure is ~5 minutes in 30 days reaching 5.9% of her closes, but at
+this gross the clip-OFF ceiling is **4.167x**. Neither is changed here.
+
 ## 2026-09-11 (aaq) — 🎫 "WIDEN UNTIL YOU FIND AN EDGE": 126 CELLS ON THE POPULATION THE BOOK NEVER CONDITIONED ON, AND THE BEST ONE IS WORSE THAN NOISE
 
 **Eamon, 11-Sep:** *"widen metrics and parameters until you find an edge for
