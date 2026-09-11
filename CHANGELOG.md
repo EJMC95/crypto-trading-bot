@@ -1,4 +1,66 @@
 
+## 2026-09-11 (abj) — 👩 MUM'S RSI BAR 36 → 42 ON EAMON'S CALL, AND IT PRODUCED NOTHING: THE BAR WAS NEVER THE BINDING CONSTRAINT, THE NOT-UPTREND CONJUNCT IS — a refutation recorded so nobody re-proposes the same knob
+
+**Eamon, 11-Sep: *"Would just like her to start trading"*, then *"Inflate the
+number to move from 36 to 42"*.** `MUM_RSI_MAX` 36 → 42 on `mum-live`,
+env-only, verified live on her row (`scan.rsi_bar` 42.0, `near_bar` 7 → 13).
+**It admitted one coin and her own uptrend rule refused it.** Recorded because a
+widening that did nothing is exactly the thing a future session re-proposes.
+
+**WHY 42 WAS THE RIGHT CEILING TO TRY.** Her own study is explicit that **only
+`rsi<42` carries information** ((qu)), and her code default is **38** — the env
+had her at **36**, i.e. running TIGHTER than shipped. So 42 is the measured outer
+edge of her own informative band, not an invention, and the bar has been walked
+on measurement three times before (25 → 30 (tr) → 32 (un) → 36/38).
+
+**WHAT IT MEASURED, and the direction is the finding.** Stable across three
+consecutive loops at `verdicts_basis: this_loop`:
+
+| | at bar 36 | at bar 42 |
+|---|---|---|
+| coins below the bar | ~2 | **~1** |
+| `both_terms_n` (below bar AND not-uptrend) | 2 | **0** |
+| `near_bar` (rsi < bar+8) | 7 | 13 |
+| opened | 0 | **0** |
+
+87 coins read · **median RSI 64.2** · lowest RSI **30.1** · 77 of 87 outside an
+uptrend · `verdicts {no_signal: 86, uptrend_blocked: 1}`.
+
+**The arithmetic that explains it: exactly ONE coin sits below 42, and it is
+INSIDE an uptrend, which her entry deliberately refuses.** Raising the RSI bar
+admits coins that are *less* deeply sold off, and those are disproportionately
+pullbacks in rising names rather than capitulations — so the two conjuncts pull
+against each other and `both_terms_n` went DOWN as the bar went UP. **The bar was
+not binding; the NOT-uptrend conjunct is, against a market whose median RSI is
+64.2.**
+
+**THE CONJUNCT IS NOT THE NEXT KNOB, and this is the refusal with the number.**
+Her `rsi<30 × NOT-uptrend` cell was the ONE of four candidates to clear the
+pre-registered exit-free bar on her own tape ((tr)), and (qu) measured a REQUIRED
+uptrend filter as actively destructive on the sibling book. Dropping the conjunct
+leaves the cell her edge was measured in, for a market state that will pass on its
+own. **A dip-buyer with no dip is a dip-buyer working**, and the honest control
+says so: her never-halted, unrailed paper twin holds **0 positions** on the
+identical reading (`rsi_med 64.2`, `rsi_min 30.1`), and its last close was a
+WINNER (`roi`) at 12:54Z before it too ran out of setups. Nothing about her live
+arm is blocking her.
+
+**THE ONE LEVER LEFT WITH MEASURED SUPPORT, named and NOT taken:** her universe is
+**87** against a venue listing ~127. That is I26's own worked example on this very
+book — *"👩 mum scanned 40 crypto names while the venue listed 127. Her cell fired
+0 times in 7 days on her list and 15 at a measured $0.1M floor. She was live for
+three days with nothing to buy"* — so supply, not sensitivity, is where this book's
+history says to look. Put to Eamon; he acknowledged and did not ask for it, so it
+is recorded as available rather than applied.
+
+**PRICED (I19), and the price is the point:** per-trade expectancy is unchanged by
+either knob — a bar is a screen, not an edge — so 36 → 42 bought **supply only**,
+and measured **zero** of it in this market state. Era **NOT** reset (an entry-bar
+notch is ordinary tuning, the (tr)/(hc) precedent). Revert: `MUM_RSI_MAX=36`, or
+drop the env entirely to return to the shipped 38. **The standing read for the
+next session: do not re-propose the RSI bar as the fix for mum not trading. It has
+now been measured at 36 and 42 in the same market hour with the same outcome.**
+
 ## 2026-09-11 (abi) — 👩 MUM'S DRAWDOWN GUARD: A RAIL THAT RE-CREATES ITSELF CANNOT BE RELEASED, ONLY RE-LEVELLED — 0.15 → 0.25, AND IT IS AN ENV NOW SO THE NEXT ONE COSTS A VARIABLE INSTEAD OF A MERGE
 
 **Eamon, 11-Sep: *"Do it"* / *"Deploy her"*, after being given the two routes and
