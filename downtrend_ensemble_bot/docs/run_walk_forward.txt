@@ -1,0 +1,25 @@
+------------------------------------------------------------------------------
+WALK-FORWARD VALIDATION
+------------------------------------------------------------------------------
+  train 60d / validate 20d / test 30d, step 30d
+
+  fold  test_from          days  trades  return%  maxDD%  avgR 
+  ----  -----------------  ----  ------  -------  ------  -----
+  0     2024-02-02 22:13Z  30.0  0       -        -       -    
+  1     2024-03-03 22:13Z  30.0  17      3.20     0.26    1.233
+
+  AGGREGATE (test windows only)
+    folds                     2.0000
+    graded                    2.0000
+    skipped                   0.0000
+    test_windows_positive     1.0000
+    consistency               1.0000
+    pooled_trades             17.0000
+    pooled_pnl                332.5900
+    pooled_win_rate           0.7059
+    pooled_average_r          1.2328
+    return_pct_median         3.2020
+    return_pct_worst          3.2020
+    max_drawdown_pct_worst    0.2630
+    consistency is the share of TEST windows THAT TRADED and were positive; folds that took no trades are counted separately, never as a 0% return. A strategy that only works in one window is a window, not a strategy
+------------------------------------------------------------------------------

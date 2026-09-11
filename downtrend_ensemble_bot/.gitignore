@@ -1,0 +1,31 @@
+# Mirrors `lighter_adaptive_ensemble_bots/.gitignore` deliberately: the two
+# packages have the same shape, so the same policy belongs in the same place
+# rather than as a second copy in the ROOT .gitignore. A root rule would also
+# be anchored there and would sit far from the code that writes these files.
+
+# Generated reports. Every one is reproducible from a command in the README
+# (`backtest`, `walk-forward`, `sensitivity`), and the only data this package
+# ships is SYNTHETIC, written by `make-examples` from a seed -- so a committed
+# copy buys nothing and goes stale. `.gitkeep` is NOT matched: the directory
+# itself stays tracked so a fresh clone has somewhere to write.
+reports/*.json
+reports/*.txt
+reports/*.log
+
+# Synthetic example tapes -- regenerate with `make-examples --seed N`, which is
+# byte-identical for the same seed.
+data/examples/*.json
+
+# Runtime state is per-machine and per-run.
+state/*.json
+state/*.tmp
+state/*.db
+
+# The kill switch is an operational act, never a committed file.
+runtime/KILL_SWITCH
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/

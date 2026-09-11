@@ -1,14 +1,14 @@
 # HANDOFF — start here
 
-_Generated 2026-09-11 12:05 Sydney (02:05Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
+_Generated 2026-09-11 22:02 Sydney (12:02Z) by `scripts/session_state.py`. Do not hand-edit: regenerate it._
 
 ## Fleet signals — read before anything else
 
 **💵 REAL MONEY, RIGHT NOW**
 
-- `freqtrade-avo-maria-lighter` was shut **30% of the last 14.5d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
-- `freqtrade-mum-lighter` is **SHUT right now** — `slguard` until 14:01 Sydney (protections_locked).
-- `freqtrade-mum-lighter` was shut **19% of the last 14.5d** (66h), mostly `slguard` (46h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-avo-maria-lighter` was shut **29% of the last 14.9d** (106h), mostly `maxdd` (98h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
+- `freqtrade-mum-lighter` is **SHUT right now** — `daily_halt` (halted_today).
+- `freqtrade-mum-lighter` was shut **19% of the last 14.9d** (69h), mostly `slguard` (48h). NOTE: a rolling window keeps reporting a rail that has since been FIXED — date the events before acting on this.
 
 **🚦 AT THE GATE**
 
@@ -33,6 +33,11 @@ _Still open because:_ NOT shipped in the pass that found it, deliberately. It ch
 (aar) adversarial verification of the taker's random-entry null found THREE defects. One is FIXED (the side inference read a nullable column and replayed 7 of 208 era closes as SHORTS; corrected to derive from the tag, AST-pinned at both call sites, verdict unchanged and stronger on every family). TWO ARE RECORDED AND NOT PATCHED. (1) THE CALIBRATION GATE CERTIFIES A PRICE BASIS THE NULL NEVER USES: `replay_real` enters at the ledger's own FILL price while the null's `mu` enters at an HOURLY BAR CLOSE, so `d_i` mixes two bases; run the book's own closes through the null's path and the drift is 0.661pp, ABOVE the 0.60pp tolerance -- i.e. on one consistent basis the gate would REFUSE, and the family excess reads -0.993pp (t -1.17) rather than -0.242pp. (2) THE NULL IS TIME-BLIND: both docstrings claim 'same coin, SAME window' and the draw is uniform over the coin's entire ~46d tape. Hour bias is small (-0.100 to +0.136pp); WEEKEND bias is +0.632pp.
 
 _Still open because:_ NOT patched in the same pass under the fleet's own 'ship narrow, verify in the live payload, then widen' rule -- (fz) changed six surfaces at once and spent six entries repairing itself. BOTH defects push the refusal the SAME way (against the book), so no verdict of (aaf)/(aan)/(aar) depends on them and nothing is blocked on this. What IS blocked: no time-conditioned cell from this null may be read as matched until (2) is fixed, and no absolute level from it may be quoted until (1) is. Fix (1) by walking BOTH arms from the same price basis (prefer the bar close, which the null cannot avoid) and re-running the gate; fix (2) by drawing within a matched window rather than the whole tape. Closes when the CHANGELOG records 'null basis+window READ:' with the re-run numbers.
+
+### `ensemble-rows-registered-but-unpublished`  ·  owner: **OPERATOR**
+(aao) registered `downtrend-ensemble` and `adaptive-ensemble` on the dashboard (VARIANT_ONLY + LABELS, certified append-only against the live feed by BOTH verifiers), and wired an optional `fleet_publish` into each package's paper loop so the row is real when a soak runs. Nothing publishes them today: neither package is a Railway service, so both rows are registered and empty. Deliberately NOT in `EXPECTED` — that is the bucket that resurrects a permanent 'no data yet' ghost card, which this dashboard has carried twice before — so an empty registration costs nothing while the decision is open.
+
+_Still open because:_ provisioning a Railway service per book costs a container on Eamon's account and is outward-facing, so it is his call rather than a session's. The code half is done and tested; what remains is one provisioning dispatch per book (the (lr)/(mk) one-shot pattern) plus a Dockerfile and a deploy route. Until then the rows are inert and harmless.
 
 ### `live-vs-graded-policy-two-mechanisms-uncovered`  ·  owner: **session**
 (aan) shipped `golive_readiness.live_fillable`, which closes ONE of the three mechanisms by which a book's LIVE arm can run a narrower or different policy than the arm the go-live gate grades: the per-mode LENS/SIDE allow-list. A fleet sweep of all 14 graded books confirms the other two are real and UNCOVERED. (2) THE LEVER LANE: `apply_tuning()` returns {} on 🎫 the taker's live arm, so a live arm takes NO growth-rail lever while the graded shadow ran tuner-moved bars -- its era spans 19 distinct bracket settings (tp in {0.03,0.04,0.05,0.06}, max_hold_h in {24,48,72}, brk_range in {0.91,0.93,0.95,0.97}). Intersecting both taker mechanisms: **2 of 208 closes (1.0%) are BOTH live-fillable AND booked at bars a live arm would run.** (3) THE CAPACITY PIN: ⚖️ Counterweight's live arm pins `K = GOLIVE_K` and refuses the `fundspread.k` lever; K is a rank truncation, so it changes WHICH coins are held. LATENT today (env default K=5 == GOLIVE_K=5, no lever open), not absent. AND A SECOND CONFIRMED BOOK, DIRECTION INVERTED: 👩 mum's shadow is NARROWER than live -- the judge's `xp.mum.vel_lo/vel_hi` steer the twin only, the velocity band is an ENTRY filter, and her own census reads `vel_in_band 2 of vel_read 102`, so the graded sample is a strict SUBSET of the live population. CLAUDE.md already says 'while running, the twin is an EXPERIMENT arm, not a control arm'; the GRADER does not know it.
@@ -129,35 +134,56 @@ _Still open because:_ each one needs the bot to stamp its own governing quantity
 
 _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and REFUTED-AS-OVERFIT, adversarially confirmed — the best cell's whole effect is the three crash rows; ex-crash it forgoes $+10.17 of winners and refuses 73% of trend_breakout's supply (I7); random-veto null P~0.10, forced-kept P=0.0002 / conditional P=0.37. BOTH her dials are now measured dead (exits at (tm), the entry filter at (tp)). What remains: (1) the rank1-vs-rank2 gap (+0.55pp, NOT explained by extension — corr −0.050) gets its own pre-registered study on fresh closes once rank-3 stamps accrue; (2) her live arm accrues under the (tm)-fixed policy — time, not tuning.
 
-## Shipped today (68 commit(s), entries (zt))
+## Shipped today (59 commit(s))
 
-- `5d42f43` wip: CI wiring + carried row
-- `7fe205f` wip: antibodies for the retired book's fossils
-- `974f5ba` wip: drive the quarantine branch, resolve both path roots
-- `ad33a80` wip: sibling imports resolve under both paths
-- `36bf89c` wip: live_pnl_audit grades the filtered sample
-- `a59e308` wip: make the quiet-when-current branch drivable
-- `74b34f4` wip: close two vacuous assertions the mutation round found
-- `33b4e57` wip: prompt audit + tracked prompts
-- `9271d5d` wip: review cadence instrument + fold same-cause verdict rows
+- `a4f2c59` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `e84d3b2` (abe) the brain lost two hours to one truncated read, and nothing recorded it
+- `a7d86cf` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `23628d1` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `bae8920` [deploy-live-mum] (abe) Eamon's manual trades are dated — mum's true drawdown FAILS the bar, avo's is UNDECIDABLE
+- `58b8a71` (abd) the whole judgement layer is in git now — Eamon: "track the rest too"
+- `fb25485` (abb) a blanket renumber swept another session's citations — repoint five, and renumber only your own
+- `1aed728` (aau) a red guard still silences the two behind it, and the marker guard's own remediation was unreachable (#307)
+- `0d779e6` (aba) the five routines that review this fleet were the one thing it did not instrument
+- `03e74b0` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
+- `09488a1` (aaw) fix 17 stale self-citations: the code said (aau), which is another session's entry
+- `a3c2517` (aao) CodeQL's eleven warnings triaged — and one was a test that proved nothing
+- `85942dc` (aao) repoint the enforcement reference at the renamed guard
 - `a4a0688` [deploy-live-mum] (aaw) the drawdown bar's two peaks, and the stop-death pager's clip-OFF ceiling — both published beside, neither switched
+- `4477c44` (aao) the carried-row guard read one number from the source and one from the live list
 - `f0ca3b0` (aau) regenerate HANDOFF
 - `3582b6a` (aau) the refusal goes where money is armed; the random-band screen the six bars cannot apply
 - `28305fb` (aat) the random-band screen the six bars cannot apply
 - `987c6a6` (aat) golive_blocker reads live_fillable — the stop belongs where money is armed
 - `ef24a22` (aas) an instant is not a property: four detectors publishing a standing claim built from one reading — two of them mine (#305)
+- `e2e0f85` (aao) record the eaten carried row: 22 rows in, 21 out, every guard green
+- `7edfbc1` Merge remote-tracking branch 'origin/main' into claude/market-downturn-bots-afz0cn
 - `a58e41d` (aat) mum's gross 5.0x -> 9.5x, not the 9.6x asked for: her stops die at 9.507x
+- `e0e524b` (aao) record the one genuinely open item where the next session will hit it
+- `a7c95ea` (aao) the CodeQL warnings: two dead guards in the sizer, eight leaked handles, one dead assignment
 - `f441e53` (aaq) the variance route is closed too; the offered-set feed window is the one cheap widening — carried. (aap) regime presence corrected in place
+- `2e6b8aa` (aao) the last CodeQL error: name what makes a reconciliation unclean
+- `785b21c` (aao) CodeQL's 12 errors were one real bug and one collision that broke both suites together
 - `c8feb42` (aaq) the binding constraint is the sample, not the width — 1.69pp single-hypothesis floor against a 1.38pp book mean
 - `ea00c76` (aar) regenerate HANDOFF for the two new carried rows
 - `59b28cb` (aar) the null inferred side from a nullable column — 7 of 208 era closes replayed as shorts; (aaf) superseded, (aaq) corrected
 - `8542912` (aar) the null instrument inferred side from a nullable column — 7 of 208 era closes replayed as shorts
+- `f5b4763` (aao) the soak override is narrower than its name: measured by trying to open the gate
+- `7890004` (aao) the same paper-optimism in the sibling: entries at the signal price, exits at the mark
+- `57e86de` (aao) paper was a softer test than the backtest that validates it
 - `6a2eb94` (aap) a test that sets env at import reddens every subprocess selftest — the defect the carried row named, reproduced and now ratcheted
+- `529c66d` (aao) a finished soak publishes a terminal row: an attended run that just stops goes stale forever
+- `e29002a` (aao) the two ensemble books get real dashboard rows -- publisher first, then the row
 - `4adbf4a` (aaq) offered-set instrument: fix the permutation units and price Q1's look-ahead
 - `390d21b` (aap) the entry capture was six fields wide and the ticket is eleven — regime never reached a single close
 - `338f21a` (aao) extract entry_evidence to a pure owner — the inline form survived its own mutation
 - `f68b585` (aao) the entry capture was six fields wide and the ticket is eleven — regime never reached a single close
+- `fe13042` (aao) the sweep prints its progress: 40 full backtests is a silence people kill
 - `713dd67` (aao) PRE-REGISTRATION: the taker's offered-set search, written before any outcome was computed
+- `c460258` (aao) Operation short: a conservative short-biased ensemble, and a 20-point scorer that could never fire
+- `f40d2e7` (aam) CodeQL found two real ones: venue-supplied symbols reached a filesystem path, and the live gate copied the whole environment
+- `909637d` (aam) the sweep is also a lever audit: every cell negative, and two knobs that cannot bind
+- `579ab50` (aam) Two short mirrors of mum and avo, measured and both refused - and the ensemble system that refusal argues for
 - `3f10ddf` (aan) the sweep: it is a class, three mechanisms deep, and mum's shadow runs the other way — two carried
 - `0faaa04` (aan) verified on the deployed payload: live_policy on the row, live_fillable inert=true, ready unchanged at 6/6
 - `1b94335` (aan) the growth lens: breakoutup TIES random, not beaten — and two structural blockers on re-aiming LIVE_SIDES; (aaf) corrected in place
@@ -169,36 +195,6 @@ _Still open because:_ [26-Aug (tp)]: the parabolic-extension veto was RUN and RE
 - `755816d` (aan) scope the declaration guard to the live_policy node — the module-wide form survived its own mutation
 - `91fdc55` (aan) WIP: live_fillable + the taker's live-arm declaration
 - `0b9f9e6` (aag)(aah)(aai)(aaj)(aak)(aal) 🫀 Sick organs: six systems that knew something and had no way to say it (#303)
-- `0df3303` (aaf) the taker's random-entry null: random beats it on every family, and the one family LIVE_SIDES admits is negative
-- `d2c6547` [deploy-live] (aae) avo's volume floor was a proxy for a thing the fleet now measures directly — re-derived 0.5 -> 0.15 from (vd)'s own clip ratio
-- `eb2b599` (aac) avo's slot cap is not the constraint — refused with evidence, and my own census reading was the artifact
-- `98738b3` (aab) the handoff reads the live fleet: two books have been READY for six days and nothing said so
-- `fc48964` (zy)(zz)(aaa) the letter guard sees open branches; Rich Dad gets a census series; Hull's cap raise measured and deferred to one turnover
-- `c62297f` (zw) pin skip_if_same, the baseline flag, and next_letter's extra_claimed — the preventive half had no test at all
-- `b2c3665` (zw) drive the open-branch arm from main(): a 24-mutation round left 8 alive and every survivor was the WIRING, not the comparison
-- `f1fa9ae` (zw) the letters guard sees OPEN BRANCHES, not just origin/main — nine renumbers in one day, and (ze)/(zf) are held on branches it cannot see
-- `055be0b` (zw) pin the census wiring by AST: a mutation round showed the substring check left BOTH halves deletable
-- `95eb6ae` (zw) 🏦 Rich Dad publishes a census TIME SERIES, not just this loop's instant — its refusals were a sample of n=1 cycle
-- `6195699` (zw)(zx) renumber: origin took (zt) and (zu) — ninth collision today; both letters picked by checking every OPEN BRANCH, not just origin/main
-- `7c76fa8` (zw) renumber the cohort-reader citations: origin took (zt)
-- `ea7bdfc` (zt) regenerate HANDOFF after the daily review
-- `c14f08d` (zt) changelog: the cohort reader's history-shape blind spot, measured at 2,174 of 17,261 snapshots
-- `bb394ea` (zu) renumber: origin took (zs) for the Counterweight date move — seventh collision on this branch today
-- `121d2fc` (zt) the cohort reader knew the live key's dict and not the history's compacted list: 2,174 fleet-risk snapshots read as '0 longs against a budget of 1e9'
-- `0282715` (zq) the record: the daily review's two stale rule copies and the publish stall it caused (renumbered (zn)->(zq): (zn) landed on main via #298 while this sat unpushed); store-side hazard CARRIED; HANDOFF regenerated
-- `5674619` (zn) the review stalled the fleet's publishes three times today: a never-committed read transaction held bot_pnl while the grader's lazy import ran the store's ALTER on a second connection — autocommit, lock_timeout, idle-in-transaction timeout, and the store session hardened
-- `387daad` (zi) the MTM fetch is scoped to the books it can decide — worse-of-both cannot pass a failing book, and fetching every living book's series took the review past a 10-minute timeout
-- `ca35883` (zi) the daily review graded the maxDD bar REALISED-only while the canonical grader folds MTM — the taker read 2.5% here beside a published 4.6% (basis mtm)
-- `feb42c6` (zi) the daily review's REACH ceiling was computed on a number no consumer enforces: pooled 20/20 RED over two cohorts with ten free slots each
-- `40c5397` (zv) The four findings the review ran out of budget to verify — and one says (zu) mislabelled a real-money number
-- `d47c580` (zu) the health banner's three permanently-true lines, and two more descriptions
-- `0f2d863` (zu) correct the renumber count: 41 citations moved, the 42nd was the generated HANDOFF
-- `8074820` (zu) the spend row's days-to-gate is days-to-DECIDABILITY, and said so
-- `7a8e1cc` (zu) regenerate HANDOFF.md after the dashboard pass
-- `0cbdd64` (zu) RENUMBERED (zt) -> (zu): a concurrent session landed its own (zt) on main
-- `5d31030` (zt) The week's telemetry reaches the card — and the page was still running the go-live gate the fleet retired in July
-- `250a9df` (zt) regenerate HANDOFF.md after the basis declaration
-- `ab9db2f` (zt) Two sessions read ⚖️ Counterweight's sample definition differently on the same day — the fleet's only pre-registered read with no instrument
 
 ## How this file stays honest
 

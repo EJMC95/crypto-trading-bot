@@ -1,0 +1,9 @@
+------------------------------------------------------------------------------
+BACKTEST
+------------------------------------------------------------------------------
+  NO TRADES were taken.
+  no trades were taken -- read the rejection table before changing a threshold
+
+  Why the book stayed empty (top rejection reasons):
+      1600  regime DATA_UNRELIABLE
+------------------------------------------------------------------------------

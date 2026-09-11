@@ -1,3 +1,120 @@
+## 2026-09-11 (abf) — ONE TRUNCATED READ BOUGHT TWO HOURS OF SILENT BRAIN BLINDNESS, AND THE TEST THAT WOULD HAVE CAUGHT IT WAS ASSERTING AN EXACT COUNT OVER LIVE PRODUCTION DATA
+
+**Eamon, 11-Sep: *"please fix"*** — on the one thing the previous pass had
+declared and explicitly declined to touch as out-of-scope. He was right, and
+the scope call was wrong in a way worth recording: what I had filed as *"a
+known fragility in a test"* was a **production defect in the organ that sizes
+real money**, and the test was only the thing that noticed.
+
+**THE MEASUREMENT.** `bot_learn._fetch_trades()` did a bare
+`urllib.request.urlopen(TRADES_URL, timeout=30)` with no retry. It truncated
+once: `IncompleteRead(15472 bytes read, 35722 more expected)` — and
+**15472 + 35722 = 51194, byte-for-byte the live payload**, which then fetched
+cleanly **6 of 6** times immediately after. So: the same resource, cut
+mid-read, once.
+
+**WHAT THAT ONE READ COSTS, TRACED RATHER THAN ASSUMED — and this is why it
+is not a test problem.** `run_all.sh:116` runs the brain as
+`python3 /freqtrade/bot_learn.py || true` on a 2h loop and does **NOT** route
+it through `organ_main`. So the exception is swallowed by the **SHELL**:
+nothing is recorded on any key, nothing logs a reason, and the next attempt is
+**two hours away**. `brain-vitals` carries a 7.2h TTL, so it takes **~3 missed
+runs** before the watchdog can page. One truncated read therefore buys two
+hours of brain blindness that nobody is told about — I13 exactly, a loop that
+does not run cannot report that it did not run. And since (so)/(sp) every
+living book reads this brain through `fleet_bus.brain_clip`, **the live rows
+included**.
+
+**THE FIX IS A RETRY THAT RAISES, AND THE RAISE IS THE DESIGN.** `_read_json_url`
+retries transport faults, then re-raises. Degrading a failed **ledger** read to
+`[]` would be I4 in its purest form: an empty ledger is **byte-identical to
+"no bot closed a trade"**, so the brain would grade every bucket on nothing and
+publish fresh-looking vitals off it, with no reader able to tell. A raise at
+least leaves the keys stale, and staleness is the one thing a reader CAN detect
+(I1). Pinned by a test that mutates the raise to `return {}` **and** to
+`return []`, because the trap has two shapes.
+
+**REFUSED WITH EVIDENCE — the file has four network reads and only ONE deserved
+a change.** Lines 630 (pulse history), 789 (markets map) and 882 (candles) are
+already guarded and degrade correctly: `_mood_at` returns `None` on an empty
+history, the markets map is documented to never fabricate a 0, and the candle
+read returns `None`. Those are **enhancements** under the bus contract, where
+empty correctly means "keep the configured default". The ledger is the one read
+where empty means "lose the information the organ then acts on". Widening the
+change to all four would have bought nothing and enlarged the blast radius on a
+container the live books read.
+
+**THEN THE TEST, AND IT HID A WORSE DEFECT THAN THE ONE I CAME FOR.**
+`test_the_brain_publishes_a_receipt` asserts **`RECEIPT 4`** — an EXACT phantom
+count — while `_fetch_trades` merged the **live production feed** into the
+sample. Measured 11-Sep: 125 rows, **0 phantom**, so the assertion held **by
+luck**. The first real halt-and-flatten — the exact event this test file exists
+for, and which gave 🙏 avo **9 phantom rows of 15** — pushes the receipt above 4
+and **reddens CI on every open PR in the repo**, for a reason no author could
+connect to their change. Both clean-interpreter bodies now stub the feed. The
+function under test is untouched: `_fetch_trades` still really runs, still does
+its own `sys.path` insert, still imports `golive_readiness` for real.
+
+**Proven, not claimed** — with the feed pointed at an unroutable host
+(`127.0.0.1:9`): the OLD test **FAILS** (`URLError: Connection refused`), the
+new one **passes**. Before and after, same command.
+
+**9 OF 9 MUTATIONS KILLED — and the first round had a survivor that mattered.**
+`LEDGER_TRIES = 1` removed the retry from **production** while every test stayed
+green, because they all passed `tries=3` explicitly: the guard was vacuous about
+the only path that ships. Fixed by pinning the **default**. The same round
+exposed a second wart: `def _read_json_url(..., tries=LEDGER_TRIES)` evaluates
+its default once at IMPORT, so the env var read as live and was frozen — I18's
+registered-but-inert shape. Resolved at call time, pinned by a test that moves
+the constant and requires the next call to see it.
+
+**AND THE FIRST DRAFT'S COMMENT DESCRIBED A BEHAVIOUR THE CODE DID NOT HAVE.**
+It said *"a 404, a 500 or an auth failure is NOT in here on purpose"* while
+listing `URLError` in the transient tuple — and **`HTTPError` is a SUBCLASS of
+`URLError`**, so 404s were retried. Code and description disagreed and only the
+description was read. `_is_transient` now makes the claim executable: 4xx never
+retried, 429 and 5xx retried, both pinned.
+
+**THE INSTRUMENT FAILED ITS OWN POSITIVE CONTROL FIRST, which is the only
+reason its answer is worth anything.** To measure how wide the class runs I
+patched `socket.socket.connect` and filtered out local addresses — and it
+reported **`NETHITS none` on a fetch that had just succeeded**. Cause: this
+environment routes outbound HTTPS through a **local agent proxy**, so every
+fetch is a `127.0.0.1` connect and the "skip local" filter swallowed all of it.
+Rebuilt above the proxy at `http.client`, with a positive AND a negative
+control run before trusting it, and moved into a `sitecustomize.py` so
+**subprocess-spawning tests are covered** — a parent-only probe reads "none"
+for exactly the test that motivated the sweep. That is the `(po)`
+inspects-nothing rule landing on my own tooling for the second time tonight.
+
+**AND THE SWEEP SAYS THE CLASS IS ONE INSTANCE WIDE, WHICH IS WHY THE OBVIOUS
+FIX WOULD HAVE BEEN WRONG.** The tempting move was a repo-wide "no network in
+tests" ban. Measured instead: the suite makes **four** live fetches, and
+**three of them are correctly built** — `test_both_shapes_agree_on_the_live_ledger`
+and `test_coin_quality_phantoms` both `pytest.skip` on a dead feed, and the
+first additionally asserts `feed` is non-empty so it *cannot pass vacuously*;
+the remaining pair are script selftests reached through `test_selftests.py`
+(`/bus.json`, `/pnl.json`), whose individual tolerance I did **not** verify and
+am not claiming. A blanket ban would have deleted three deliberately-designed
+live integration checks to fix one defect.
+
+**So the class is not "a test touches the network" — it is "a test touches the
+network WITHOUT TOLERATING ITS ABSENCE", and exactly one instance existed.**
+That one also happened to be the only one asserting an exact count over live
+production rows. Both halves are now gone from it, and the three tolerant
+checks are untouched.
+
+**[RENUMBERED (abe) -> (abf), 11-Sep.** Another session landed a different
+`(abe)` on main while this was open. Theirs is cited **10 times from tracked
+code** (`scripts/golive_readiness.py` x7, two test files x3) and mine had
+**zero**, so by rule 3 the cited entry keeps the letter and this one moves.
+Renumbered surgically per rule 4b — this entry's own single header occurrence,
+asserted `count == 1` before the write, never a blanket sweep over the tree.**
+
+  ENFORCED BY: `bot_learn.py::_read_json_url`, `bot_learn.py::_is_transient`,
+  `tests/autonomy/test_phantom_consumers.py::test_an_exhausted_ledger_read_RAISES_and_never_degrades_to_empty`,
+  `tests/autonomy/test_phantom_consumers.py::test_the_SHIPPED_default_actually_retries`
+
 ## 2026-09-11 (abd) — THE WHOLE JUDGEMENT LAYER IS IN GIT NOW, AND TRACKING IT MOVED TWO THINGS THAT HAD TO MOVE WITH IT
 
 **Eamon, 11-Sep:** *"track the rest too"* — the call `(aba)` put to him after
@@ -1191,6 +1308,264 @@ none of the five changed files is in `_BUILD_SHARED`**, so no live/shadow stamp
 can diverge from it. Main only, no marker — nothing here alters a trade
 ((mm)); every file rides the existing `freqtrade-bots` auto-deploy path.
 
+
+## 2026-09-11 (aao) OPERATION SHORT: a second, deliberately conservative short-biased system — and the 20-point scoring component that was STRUCTURALLY UNREACHABLE
+
+**Eamon, 10-Sep: *"Please review and start operation short."*** `downtrend_ensemble_bot/`
+is an exchange-agnostic short-biased ensemble, built to a 30-section spec, and it is a
+DIFFERENT animal from `(aam)`'s Lighter-native sibling rather than a port of it: 1.5x
+leverage against 10x, 0.25% risk/trade, a score bar of 70 against 62, RR 1.8 against 1.4,
+plus three things the sibling has none of — breakdown/retest as a scored setup, a CUSUM
+change-point detector with hysteresis, and Monte Carlo trade-order reshuffling.
+**20 modules, 272 tests, 22 of 22 mutations killed.** No edge is claimed: the only data
+that ships is SYNTHETIC and every report says so.
+
+**THE FINDING THAT JUSTIFIES THE WHOLE COMPONENT CENSUS — a 20-point scorer that could
+never fire, and the arithmetic is one line.** `breakdown_component` took its support
+level as `rolling_min(lows, 20, end=i-1)` and then searched `[i-8, i)` for a close BELOW
+it. Those eight bars are INSIDE the twenty the minimum was taken over, and
+`close[j] >= low[j] >= min(lows over any window containing j)` — so the test could not
+pass. Not rarely: **never.** Measured on **400,000 random bar-sets obeying only
+`close >= low`: 0 hits.** It is the second-largest weight in a 100-point ensemble, it
+scored **0.00 on every one of 332 signals**, the score bar was never reached, and the
+book took **zero trades** while looking like a selective strategy. Corrected windowing
+(range formed on the bars BEFORE the break window) fires at **7.5%** — matching the
+theoretical base rate on the same bars — and the book then trades. **A component that
+returns 0.0 is byte-identical between "the market did not do this" and "this can never
+fire", and only the per-component census separates them** — the (lv) `{open: 0}` shape,
+found in a scorer instead of a sleeve.
+
+**FIVE MORE DEFECTS, each caught by the thing built to catch it rather than by re-reading:**
+* **A stop on the WRONG SIDE of its own entry.** `last_swing` returns the most recent
+  CONFIRMED pivot, and on a falling tape price routinely runs straight through it — so
+  the last swing LOW sits ABOVE the close. A long sized off it is stopped on the fill,
+  and `risk = abs(entry - stop)` is happily positive, so nothing upstream objects.
+  Measured on 8 of 8 seeds. Fixed in `build_stop` AND refused again in `build_plan`,
+  where a number becomes an ORDER.
+* **An `orders` INSERT one placeholder short of its own table** — every order write in
+  paper or live mode would have raised. Found by a test that drives every writer once;
+  all positional INSERTs are column-named now.
+* **The metric that reports a run could kill it.** `cagr` annualised a span of seconds,
+  sending the exponent to 3e7 and raising `OverflowError` from inside `metrics()`. A
+  floor (`MIN_ANNUALISE_DAYS`) now refuses rather than fabricating — and the sharper
+  half is a 1-day 10% gain, which annualises to 6e14% WITHOUT overflowing, so a
+  try/except would have masked nothing.
+* **A capability name is a string, and a typo answers False forever.** Callers asked for
+  `place_reduce_only_stop` (a method name) of adapters publishing `native_stop` (a
+  capability name), so EVERY plan carried "WARNING: the adapter reports NO native stop"
+  — including from the mock that fully supports one — and the live gate's
+  protective-exit lock was closed against an adapter that would have passed it. **A
+  warning that fires on everything is a warning the operator learns to ignore.**
+  `CAPABILITIES` is one vocabulary and an unknown name now RAISES.
+* **A loss with no matching entry record was invisible to the portfolio lockout** — the
+  restart case, where the entry list starts empty and the trades most likely to be going
+  wrong are exactly the ones that span a restart.
+
+**AND THE MUTATION HARNESS ITSELF WAS WRONG, which is the (po) shape at one more remove.**
+`shutil.move` carries the ORIGINAL file's mtime, which can be older than the `.pyc`
+written while the file was mutated — so Python reused the MUTATED bytecode and the
+harness graded stale code. It reported `restored: RED` on a clean tree, and re-grading
+after the fix turned two KILLED verdicts into SURVIVED. **A guard that verifies guards
+needs its own control.** Now 22/22, with the survivors covered by a swept property test
+rather than a lucky seed: removing EITHER stop-side guard alone survives (genuine
+defence in depth), removing BOTH reddens.
+
+**WHAT IT REFUSES, and the refusals are the deliverable:** unrestricted market orders
+(never emitted — the most aggressive build is a marketable limit with a slippage cap,
+and an unknown spread is never marketable); widening a stop (monotone toward the
+position on both sides — the spec's own short-trail formula was `max`, which is the LONG
+form, and is documented as a deliberate departure); carrying an unprotected position;
+blind retries of a signed order; emulating a missing venue feature; clamping an
+out-of-range setting (`validate()` REJECTS — clamping tells the operator nothing);
+and modifying an existing dashboard (`dashboard_safety` is a VERIFIER with no writer in
+it, and refuses outright when `/pnl.json` cannot be verified).
+
+**LIVE IS REFUSED BY SEVEN LOCKS OF DIFFERENT KINDS** — a config mode, two env vars, a
+human at a terminal, a soak report fingerprinted to THIS configuration, a clean venue
+reconciliation, and a protective-stop capability probe. Different kinds on purpose:
+three env vars would all fall to one careless `export`. There is no `--yes`. The one
+bypass (`PAPER_SOAK_OVERRIDE`) relaxes a single lock, is stamped in the gate's own check
+map and printed in the banner, so a bypassed soak can never look like a passed one.
+
+**MEASURED ON THE SHIPPED SYNTHETIC TAPE, and reported as what it is:** 8 trades,
++0.78%, and the robustness gate **REFUSES** it on four counts (underpowered at n=8, one
+market carries 109% of P&L, top-3 trades are 141% of profit, halves disagree). `backtest`
+exits **2** on a refusal so a CI job cannot go green on a configuration the gate
+rejected. Walk-forward over the example tapes: 2 folds, 1 traded, and the aggregate
+carries its own power caveat because `consistency 1.000` over one window reads like a
+result and is not one.
+
+**Also fixed, and it reaches `(aam)` too:** the root `.gitignore`'s `.env.*` rule was
+silently excluding every `.env.example` template, so `lighter_adaptive_ensemble_bots/`
+shipped without the file its README tells the reader to copy. One exception line, both
+packages.
+
+**[SAME DAY, THE DASHBOARD HALF — Eamon: *"remember to update the pnl dashboard with
+the new bots when youre finished and double check the works doen"*.]**
+
+**PUBLISHER FIRST, THEN THE ROW, and the order is the whole point.** A dashboard row
+for a bot that publishes nothing is a permanent *"no data yet"* ghost card, and
+`pnl_dashboard.py`'s own source records having carried two of them (*"a retirement must
+not leave a placeholder haunting the staged sections"*). So both packages gained an
+OPTIONAL `fleet_publish` — `bot_pnl_store` imported lazily, a silent no-op without it,
+so each package's suite still runs with no fleet and no database. `status` is **`paper`,
+never `online`** (checked against `fleet_watchdog_svc`'s OWN accepted tuple, parsed from
+its source rather than read from a doc block), and the return value is KEPT rather than
+discarded. Then the row: `VARIANT_ONLY` + `LABELS` only, **never `EXPECTED`** — that is
+the bucket that resurrects the ghost. `SLOW_LOOP`, `STALE_SECONDS`, every existing row
+and the other `CURRENT_BOTS` members untouched; the live feed is byte-identical before
+and after (15 rows, none lost, none gained).
+
+**THE DOUBLE-CHECK FOUND MORE THAN THE BUILD DID. Seven, and the last two are the
+interesting ones:**
+* **My first dashboard patch CORRUPTED `nav-cook`.** Inserting before a closing brace
+  that shares its line with the last entry produced `"nav-cookdowntrend-ensemble"` — a
+  glued entry and `nav-cook` LOST. The AST verifier caught it on its first real use.
+* **`VARIANT_ONLY` was not in `APPEND_ONLY`** — the one registry the patch actually
+  touched was the one nobody guarded. Added, with `SCANNERS`/`STOCKS`/`FREQTRADE`:
+  guarding `CURRENT_BOTS` and not its parts guards nothing.
+* **THE TWO VERIFIERS DISAGREED**, which is why there are two. The line-based one called
+  the legitimate append a REMOVAL, because growing a set rewrites the line its brace sits
+  on. A check that fires on the one operation it exists to permit is a check that gets
+  waived — and the real removal is waived with it. Narrowed to forgive exactly that shape
+  and nothing looser.
+* **PAPER WAS A SOFTER TEST THAN THE BACKTEST THAT VALIDATES IT.** Fills landed at the
+  exact quote with no slippage and a round trip charged one leg of fees, while the
+  backtester charged spread, slippage and both. The soak GATES LIVE TRADING, so that
+  fails in the expensive direction. Both packages now charge `slippage + spread/2` on
+  both legs, pinned by the sanity check the frictions exist for: open and close at the
+  same price and the book must be DOWN.
+* **AN ATTENDED SOAK THAT SIMPLY STOPS goes stale forever.** Unlike every other row here
+  it ends, and `stale` is computed from row age regardless of status — the *"a line that
+  is always present is a line nobody reads"* failure `fleet_watchdog_svc` warns about in
+  its own words. Both publish a terminal `halted` row carrying `extra.soak_ended`.
+* **CODEQL: 12 ERRORS, AND ONE OF THEM WAS HIDING SOMETHING WORSE.** Seven were "wrong
+  number of arguments" — CodeQL had resolved the SIBLING package's helper, because both
+  packages have a `tests/conftest.py` defining `make_market` and `from conftest import`
+  goes through `sys.path`. **Measured: running both suites in ONE pytest invocation
+  failed to COLLECT 8 files.** Each green alone and broken together, which is the worst
+  shape because every local run looks fine. Fixed at the root twice — helpers into
+  uniquely-named modules (explicitly importing `conftest` is the anti-pattern), which
+  then exposed six shared test-file BASENAMES, renamed per pytest's own hint.
+* **THE `-O` FINDING.** Two flagged asserts opened files inside the assertion; four
+  CodeQL did NOT flag were the load-bearing ones — `assert e.update(inp).regime is ...`
+  advances the regime engine as a SIDE EFFECT of the assertion, so under `python -O` the
+  hysteresis sequence those tests are ENTIRELY ABOUT never runs and they pass while
+  testing nothing. Class closed; both suites verified under `-O`.
+
+Remaining CodeQL warnings triaged in the same pass: **two DEAD guards in the position
+sizer** (`eq <= 0` re-checked after an early return already refused it — removed, with
+the precondition named so whoever moves that return knows what they break), eight leaked
+file handles (two in production code), and a dead double-assignment in a parametrised
+test. Plus a lint sweep: 24 unused imports, three unused locals, a loop variable
+shadowing a module-level import. pyflakes clean across both packages.
+
+**The 40-cell sweep finished** on the 166-day example tapes (~29 min, and it now prints
+per-cell progress with an ETA — 40 silent backtests is a silence people kill):
+`ema_fast` **SENSITIVE at 7.17pp**, the largest in the grid; seven knobs PLATEAU; and
+**two measured INERT** — `ema_mid`, and `minimum_reward_risk` for a STRUCTURAL reason
+worth recording: targets are fixed R-multiples of the stop, so reward/risk is `tp2_r`
+**by construction** and the bar can never bind below it. Declared in `config.py` and
+pinned by a test, not quietly left inert. Shipped config: 14 trades, +0.60%, and the
+robustness gate **REFUSES** it as underpowered.
+
+**CARRIED (I11):** the two rows are REGISTERED and nothing publishes them, because
+neither package is a Railway service. `session_state.CARRIED` holds
+`ensemble-rows-registered-but-unpublished`, owner **OPERATOR**, closing when either row
+appears on the live feed. An empty registration costs nothing precisely because it is not
+in `EXPECTED`.
+
+**[SAME DAY — A CARRIED ROW WAS EATEN BY MY OWN MERGE, AND NEITHER AUDIT ARM COULD SEE
+IT.]** Resolving the conflict between main's two new carried rows and mine, the `},{`
+between one of theirs and mine was dropped. **Python then read the pair as ONE dict
+literal, the later `"id"` won, and their row was silently absorbed** — the file PARSED,
+`--check` reported *"21 carried item(s), none stale, none orphaned"*, and `HANDOFF.md`
+simply did not mention it. **22 rows went in, 21 came out, and every guard agreed.**
+
+Neither existing arm can see this **by construction**: `stale` asks whether a row's
+predicate says it is done and `orphan` asks whether its subject retired — both computed
+FROM the list, so a row that is GONE is invisible to them.
+
+**THE NEW ARM COMPARES THE SOURCE TO THE PARSE — BOTH READ FROM THE SOURCE.** The
+literal's `"id"` keys are counted against its dict ELEMENTS, over one `ast.parse` of the
+file: duplicate keys survive parsing and collapse only at eval, so an absorbed pair shows
+up as one dict holding two ids. No constant to keep in step. **And it runs FIRST** —
+`stale` and `orphan` are computed from this list, so running them on a malformed one
+yields confident verdicts about the wrong rows. Structure before content.
+
+**MY FIRST VERSION OF THE ARM WAS VACUOUS AND THE MUTATIONS SAID SO.** It looked for
+DUPLICATE IDS — but a merged dict has none: Python keeps the last value for every key, so
+the eaten row leaves no duplicate and no empty field. Reproducing the real defect ran
+**GREEN** straight through it. The selftest now **runs the real guard against a planted
+defect** in a subprocess on a temp copy rather than re-implementing the check, which was
+the only way to kill the vacuity mutations — on a healthy list a correct guard and a
+hollow one are byte-identical. **3 of 3 killed** where the hand-rolled version killed
+**0 of 2**. This is I3 in its purest form, on a guard written minutes earlier.
+
+**AND THE SECOND VERSION WAS WRONG IN THE OTHER DIRECTION — CORRECTED IN PLACE per I12,
+because the paragraph above described a comparison the code was not making.** It read
+`_source_row_count() != len(CARRIED)`: the id count came from the SOURCE and the row
+count from the **LIVE LIST**. On a healthy file that is the same check. The moment
+anything appends a row IN MEMORY the two disagree for a reason that is not a defect — and
+three tests in `tests/autonomy/test_session_handoff.py` do exactly that, legitimately, to
+drive `carried_status` and the subject guard. **The guard reddened a clean tree**, and it
+reddened it inside `--check`, which those tests then assert returns 0. A guard that fires
+on its own test fixtures is one that gets exempted within a day ((mz)), so the comparison
+is now **source-versus-source** and immune to any runtime mutation, while still catching
+the dropped `},{` for the same reason as before. **4 of 4 mutations killed** — the check
+site deleted, the predicate compared to itself, the counter returning its own row count
+twice, and the id keys deduped per-dict by hand (the shape that would silently restore
+the vacuity). The transferable half: **a guard that reads BOTH of its numbers from the
+artefact it is guarding cannot be fooled by the process running it** — mixing a
+source-derived number with a runtime-derived one measures the harness as much as the
+file.
+  ENFORCED BY: `scripts/session_state.py::_source_row_counts`,
+  `scripts/session_state.py::selftest`
+
+**[SAME DAY — CODEQL'S ELEVEN WARNINGS, TRIAGED ONE BY ONE, AND ONE OF THEM WAS A TEST
+THAT PROVED NOTHING.]** `github-advanced-security` left eleven review comments on the two
+new packages. Nine are hygiene and were fixed as such: a redundant local `import json`; a
+`Store` closed in a `finally` where the class is already a context manager (now `with`);
+three empty `except` clauses, each given the reason it swallows rather than a
+`# noqa`; a discarded Bollinger mid-band; and `import *` from the helper modules, closed
+by giving each an explicit `__all__`.
+
+**THE TENTH WAS A DEFECT, AND CODEQL FOUND IT AS `ok is not used`.**
+`test_admissible_enforces_score_reward_risk_and_distance` computed the baseline
+admissibility verdict, **threw it away**, and asserted only that a `minimum_score=99.0`
+config refuses — so it carried the name of three properties and the evidence for one.
+Writing the missing positive control **failed on its first run**: the fixture's signal
+scores **66.6** against that test's own `minimum_score=70.0`, so it was **already
+inadmissible**, and the refusal the test asserted at 99.0 was produced by the BASELINE,
+not by the bar under test. Then the reward/risk limb failed too, for a second reason:
+each strict variant was a fresh `StrategyConfig` carrying the DEFAULT bars, and
+`admissible` returns on the FIRST failing one — so the assertion read a **score** refusal
+and called it reward/risk. Both are the same shape: **a refusal is only evidence about
+the bar you moved if every other bar is held where it passes.** Variants are now
+`dataclasses.replace` of the control config, one bar at a time.
+
+**MEASURED, not argued — the same six mutations against both versions of the test:**
+the old one killed **2 of 6**, the new one **6 of 6**. The survivor that matters is
+`admissible` replaced by a **constant refusal on score**: the function could have stopped
+being a function and the old test stayed green.
+
+**THE ELEVENTH: `now` accepted, normalised, and never read** — in
+`consecutive_loss_multiplier`, in BOTH packages. Not a time bug; the opposite. A
+consecutive-loss streak is an ORDER property of the closed entries, so ignoring the clock
+is CORRECT — but taking the parameter and normalising it implied a time-dependence the
+rule does not have, and two tests passed timestamps (`1000.0`, `2000.0`) that read as the
+cause of a change they had nothing to do with. The dead normalisation is gone, `del now`
+says why at the call site, and a new assertion pins the invariance: **the same entries
+give the same multiplier at clock 0, at 10^12, and with no clock at all.** The 24h
+lockout beside it is the one that genuinely reads time, and now the difference is
+visible.
+
+**AND THE FIRST ATTEMPT AT THE `__all__` FIX BROKE BOTH HELPER MODULES** — the generator
+inserted before `n.lineno`, which for a decorated function is the `def` line, **not** the
+first decorator, so the block landed between `@pytest.fixture` and its function. It was a
+`SyntaxError`, i.e. the loudest possible failure, which is the only reason it cost a
+minute instead of a session: the same off-by-a-decorator against a non-syntax boundary
+would have silently de-registered a fixture.
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
 **Eamon, 10-Sep:** *"i will put the two books that are ready live tomorrow"* —
@@ -1486,6 +1861,121 @@ Instrument this pass: `scripts/golive_readiness.py::live_fillable`. Pinned by
 `tests/autonomy/test_live_fillable.py` (29 tests). Closes nothing carried —
 `(aaf)` closed `taker-random-entry-null-blocked-on-ci` last night; this closes
 the class that made it necessary.
+
+
+## 2026-09-10 (aam) — TWO SHORT MIRRORS OF 👩 mum AND 🙏 avo, MEASURED AND BOTH REFUSED — AND THE ENSEMBLE SYSTEM THAT REFUSAL ARGUES FOR
+
+**Eamon, 10-Sep:** *"On days like today where the market is down, we need 2 bots
+that work like Avo and mum that short these sorts of occasions"* → then, the
+same session, the full spec for **`lighter_adaptive_ensemble_bots`** and *"please
+use all of our current progress and work ... make these a show stopper to
+highlight how far we have come"*.
+
+**THE TWO BOOKS WERE MEASURED BEFORE ANY BOT CODE WAS WRITTEN, AND NEITHER
+CLEARS ITS OWN GATE.** Instrument `scripts/study_short_mirrors_2026-09-10.py`;
+full working `STUDY_SHORT_MIRRORS_2026-09-10.md`. Mirrors taken from the shipped
+carriers, not invented: mum's `rsi<38 AND NOT e50>e200` → `rsi>62 AND NOT
+e50<e200`; avo's `e50>e200 AND rsi<42 AND close<BB_lo` → `e50<e200 AND rsi>58
+AND close>BB_hi`. Brackets mirrored in magnitude. LAG-1 entry, bracket walked
+from the entry bar forward, stop wins a same-bar tie, 24 crypto books ≥$1M —
+**208d at 1h, 500d at 4h.**
+
+**CALIBRATED FIRST, BOTH GATES DECLARED.** Positive control **6 of 6 arms
+exact** — a planted ±2%/day recovers **+2.000%** through `max_hold`, ±40%/day
+recovers the ladder bar **+2.000%** through `roi` and the stop **−4.000%**
+through `sl`, on BOTH sides (a sign-flipped short side would read every cell
+backwards). Long reproduction REPORTED and it does **not** match the live books
+(mum's cell −0.034%/t=−0.64, avo's −0.660%/t=−0.98), so the harness speaks about
+CELLS, not about mum or avo — stated because it bounds every number below. It
+does corroborate `(qu)`: avo's entry reads negative here too.
+
+* **S1, the mum mirror — REFUTED.** Negative at every RSI bar (58→70), **t
+  −2.08 to −2.64**, both halves negative, **n=2,744** at the shipped bar.
+  Random-entry null (hm): **excess +0.037%/trade, P(random ≥ signal)=0.187** —
+  indistinguishable from drawing an entry minute at random. **The loss is
+  friction**: 0bps/side −0.002% → 2bps −0.042% → 5bps −0.102% → 10bps −0.202%,
+  at **420–535 closes/30d** on a 3-hour median hold. It wins **69%** of its
+  trades and loses money — I15 in one line.
+* **S2, the avo mirror — NOT REFUTED, NOT A BOOK.** **Excess +0.319%/trade**
+  over matched-random (null +0.070%), a **plateau** across four adjacent bars
+  (+0.35/+0.36/+0.39/+0.32), selection premium only **+0.15 t-units**, and
+  friction-robust (+0.489% at 0bps → +0.289% at 10bps). But **t=+0.93**,
+  **P=0.137**, **h2 NEGATIVE** (+1.144/−0.366), and **days-to-gate 2,092**
+  against I22's bar of **60**. A design that cannot be decided inside 60 days is
+  a STUDY, not a book: no row, no clock, no capital, no budget slot.
+
+**NO ROW WAS MINTED and no living book was touched.** I20's supply check and
+I22's spend census both sit in front of the act, and a Portuguese cohort name is
+not a reason to mint a book — the naming rule says so itself.
+
+**WHY THAT REFUSAL PRODUCED A SYSTEM.** I22's arithmetic is the argument:
+`t = S_d·√T` ⇒ days-to-gate `(2/S_d)²`, and for independent sleeves
+`S_d² = Σ S_i²`. S2 is ONE term. Eamon had already named the disease on 20-Aug —
+*"one construct, one set of tradeables, one set of entry and exits"* — and his
+own spec the same day is the cure.
+
+**SHIPPED: `lighter_adaptive_ensemble_bots/`** — 24 modules, 14 test files,
+**250 tests green**, backtest-first, long AND short, live trading gated behind
+eleven conditions and a signer that is off in code.
+
+* **Lighter-native, read from the INSTALLED SDK and the live API** — no invented
+  REST paths, no CCXT assumption. Capability report: `lighter-sdk` **1.1.2**
+  (the package's own `__version__` still reads 1.0.0 — both reported), **33 of
+  33** capabilities available, **0 problems**. `GROUPING_TYPE_ONE_TRIGGERS_A_ONE_CANCELS_THE_OTHER`
+  is load-bearing: entry + protective stop as ONE transaction, so there is no
+  window in which a filled position has no stop.
+* **THE BASIS-POINT TRAP IS ENCODED AND PINNED.** `maintenance_margin_fraction:
+  120` is **1.20%**, `min_initial_margin_fraction: 200` is 2.00% ⇒ a **50x**
+  market cap; maintenance is READ, never derived from initial. Misreading it
+  scales every liquidation estimate ~100x. Same for the settled funding series
+  being **percent per HOUR**.
+* **Leverage is not a reason to take more risk.** Size comes from the stop; if
+  liquidation would sit inside it, leverage is **walked down** (measured: a
+  wider stop takes 10x → 8x automatically) and **refused outright** when nothing
+  works — never a silent 1x fallback.
+* **The S1 refutation is enforced in code, not filed.** `momentum_component`
+  caps RSI at 15 of 100 points and scores an RSI extreme at **ZERO** for a
+  short, pinned by `test_an_rsi_extreme_scores_ZERO_on_momentum_for_a_short`.
+* **No look-ahead, structurally**, and the precompute that makes the backtester
+  usable (hours → **39s**) is licensed by `assert_causal` rather than assumed. A
+  test plants a spike in the FUTURE and requires an identical result.
+
+**FOUR REAL DEFECTS THE TESTS CAUGHT, all in my own code, all now pinned:**
+1. **A single losing trade PAUSED every strategy** — drawdown was normalised by
+   the strategy's own cumulative P&L, which starts at zero, so one −$1 trade read
+   as 100%. Now measured against a reference equity captured once; unknown
+   reference SKIPS the condition and says so.
+2. **Every overtrading budget silently did nothing in a backtest** — entry
+   pruning ran against `time.time()`, so historical timestamps were deleted the
+   moment they were written. A backtest would have reported a trade rate the
+   live system could never take.
+3. **A backtest overwrote live strategy health and the trade budget** — same
+   `state/` directory, and `record()` writes. A replayed losing streak would have
+   arrived as a PAUSED live strategy.
+4. **Walk-forward measured its span across ALL timeframes**, so a fold landed
+   where the 15m execution tape did not exist and reported **"0 trades"** — which
+   reads as a strategy declining to trade and is actually "there is no tape
+   here". The silent-nothing class the doctrine names.
+
+**MEASURED, and reported rather than sold:** an 8-market 31-day backtest returns
++0.85% with Sharpe 0.75 — **and the robustness gate REFUSES it** (SOL and ZEC
+each carry >100% of P&L, top-3 trades are 261%, halves disagree). A real
+180/60/60 walk-forward on 354d of 1h tape reads **+0.27% on six markets and
+−1.56% on four** — the universe flips the sign, the `(oe)` churn lesson
+reproducing on a new system. **No profitability is claimed anywhere.**
+
+**THE EXISTING FLEET DASHBOARD IS UNTOUCHED** (spec §17): `SLOW_LOOP`,
+`STALE_SECONDS`, `CURRENT_BOTS`, `EXPECTED`, `LABELS` and every existing bot row
+are unmodified. What ships instead is the verifier that would make such a patch
+provable — `dashboard_patch.py` snapshots `/pnl.json`, refuses any diff touching
+a protected name, enforces append-only merges and treats an **unreadable feed as
+a failure**, never as "nothing changed". Baseline of the live feed (15 rows) in
+`lighter_adaptive_ensemble_bots/docs/pnl_baseline.json`.
+
+**ZERO REAL MONEY MOVED. NO LIVE MARKER.** `NativeLighterAdapter` is constructed
+`allow_signing=False` everywhere in the CLI: it builds, validates and reports
+every transaction and sends none. Enabling signing is a deliberate code change,
+not a config flag — the last safeguard after the other eleven are satisfied.
 
 ## 2026-09-10 (aal) — 🦾 THE EPISODE LEDGER HAS BEEN FULL FOR AT LEAST A DAY, AND `episodes: 120` READS LIKE A COUNT
 

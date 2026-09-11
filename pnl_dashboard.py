@@ -450,7 +450,15 @@ VARIANT_ONLY = {"perps-funding-lighter", "lighter-perp-sniper",
                 # ~781) drops nav-cook-lshadow from /pnl.json and the
                 # provisioning readback chases a ghost — the (ml) shape.
                 # Shadow-only; base never publishes.
-                "nav-cook"}
+                "nav-cook",
+                # [2026-09-11 (aao)] The two ENSEMBLE research systems.
+                # VARIANT_ONLY and deliberately NOT `EXPECTED`: EXPECTED
+                # resurrects a placeholder card for a base that never
+                # publishes, and this dashboard has already carried two
+                # permanent "no data yet" ghosts for exactly that reason.
+                # Both publish ONLY a -lshadow row, only while a paper soak is
+                # running; $0 research books, zero keys, nothing signs.
+                "downtrend-ensemble", "adaptive-ensemble"}
 EXPECTED = ["perps-funding-carry",
             "event-listing-sniper"]
 
@@ -630,6 +638,9 @@ LABELS = {
     "pm-abbott":                   "🥊 Abbott — momentum scalper",
     "pm-rudd":                     "🌏 Rudd — funding diplomat",
     "pm-gillard":                  "🤝 Gillard — dislocation fader",
+    # [2026-09-11 (aao)] the two ensemble research systems (paper only).
+    "downtrend-ensemble":          "🪜 Downtrend Ensemble — short-biased ensemble",
+    "adaptive-ensemble":           "🦅 Adaptive Ensemble — Lighter-native ensemble",
 }
 
 # One-line strategy brief per bot (shared by its venue variants — the chips

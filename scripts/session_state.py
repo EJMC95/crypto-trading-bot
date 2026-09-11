@@ -47,9 +47,11 @@ reporting rule); everything internal stays UTC.
     python3 scripts/session_state.py --selftest
 """
 import argparse
+import ast
 import datetime as _dt
 import json
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -91,6 +93,23 @@ def _has(path, needle):
 # `owner` is who can close it. "session" = the next session may just do it;
 # "OPERATOR" = it needs a decision this repo may not make.
 # ---------------------------------------------------------------------------
+
+def _ensemble_rows_publishing() -> bool:
+    """The two ensemble research rows are REGISTERED on the dashboard and
+    nothing publishes them until a paper soak runs somewhere.
+
+    Closes when either row appears on the live feed: that is the receipt that
+    a soak exists, which is the whole open question. Fail-CLOSED on a dark or
+    unreadable feed -- an unreachable dashboard is not evidence the rows are
+    live, and this row must not close itself on a network blip."""
+    feed = _fetch(FEED_URL)
+    rows = (feed or {}).get("bots") if isinstance(feed, dict) else feed
+    if not rows:
+        return False
+    want = {"downtrend-ensemble-lshadow", "adaptive-ensemble-lshadow"}
+    return any(str(r.get("bot")) in want for r in rows
+               if isinstance(r, dict))
+
 CARRIED = [
     {
         "id": "market-context-realerts-a-retired-books-frozen-census",
@@ -203,6 +222,29 @@ CARRIED = [
                     "CHANGELOG records 'null basis+window READ:' with the "
                     "re-run numbers.",
         "closes_when": lambda: _has("CHANGELOG.md", "null basis+window READ:"),
+    },
+    {
+        "id": "ensemble-rows-registered-but-unpublished",
+        "owner": "OPERATOR",
+        "what": "(aao) registered `downtrend-ensemble` and `adaptive-ensemble` "
+                "on the dashboard (VARIANT_ONLY + LABELS, certified "
+                "append-only against the live feed by BOTH verifiers), and "
+                "wired an optional `fleet_publish` into each package's paper "
+                "loop so the row is real when a soak runs. Nothing publishes "
+                "them today: neither package is a Railway service, so both "
+                "rows are registered and empty. Deliberately NOT in `EXPECTED` "
+                "— that is the bucket that resurrects a permanent 'no data "
+                "yet' ghost card, which this dashboard has carried twice "
+                "before — so an empty registration costs nothing while the "
+                "decision is open.",
+        "why_open": "provisioning a Railway service per book costs a container "
+                    "on Eamon's account and is outward-facing, so it is his "
+                    "call rather than a session's. The code half is done and "
+                    "tested; what remains is one provisioning dispatch per "
+                    "book (the (lr)/(mk) one-shot pattern) plus a Dockerfile "
+                    "and a deploy route. Until then the rows are inert and "
+                    "harmless.",
+        "closes_when": lambda: _ensemble_rows_publishing(),
     },
     {
         "id": "live-vs-graded-policy-two-mechanisms-uncovered",
@@ -1193,6 +1235,40 @@ def subject_status():
             for it in CARRIED for row in it.get("subject", ()) if row in dead]
 
 
+
+def _source_row_counts(src: str | None = None) -> tuple[int, int]:
+    """(id keys, dict elements) in the CARRIED literal — BOTH read from the
+    SOURCE TEXT, never from the live list.
+
+    The point is to DISAGREE when a row has been absorbed by a merge: drop the
+    `},{` between two rows and Python reads them as ONE dict, so the literal
+    still carries both `"id"` keys while the list is a row shorter. Duplicate
+    keys survive PARSING and collapse only at eval, which is what makes the
+    two numbers separable at all.
+
+    Comparing against `len(CARRIED)` instead — the first shape of this guard —
+    is the SAME check on a healthy file and a FALSE ALARM the moment anything
+    appends a row in memory, which a test legitimately does. Three did, and
+    the guard reddened a clean tree.
+
+    Takes the text so it can be TESTED: a counter that can only ever read its
+    own file cannot be shown to disagree with anything.
+    """
+    src = pathlib.Path(__file__).read_text() if src is None else src
+    for node in ast.parse(src).body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "CARRIED"
+                   for t in node.targets):
+            continue
+        rows = [e for e in getattr(node.value, "elts", [])
+                if isinstance(e, ast.Dict)]
+        ids = sum(1 for d in rows for k in d.keys
+                  if isinstance(k, ast.Constant) and k.value == "id")
+        return ids, len(rows)
+    raise AssertionError("no CARRIED assignment found in the source")
+
+
 def carried_status():
     """-> [(item, done)]. A predicate that RAISES counts as not-done, and says
     so: a broken predicate must not silently close an item."""
@@ -1283,6 +1359,49 @@ def main(argv=None):
         # `render` learned to read the live feeds, rendering here would make
         # every push depend on the dashboard being up. A guard has two regimes
         # and the CI one has no network.
+        # THE FIRST VERSION OF THIS ARM LOOKED FOR DUPLICATE IDS AND WAS
+        # VACUOUS -- a mutation reproducing the exact defect ran GREEN through
+        # it. When two dicts merge, Python keeps the LAST value for every key,
+        # so the eaten row leaves NO duplicate and NO empty field: it is simply
+        # gone. There is no fingerprint inside the parsed list.
+        #
+        # So compare the SOURCE against the PARSE -- and take BOTH numbers
+        # from the source. The literal's `"id"` keys against its dict
+        # ELEMENTS: duplicate keys survive parsing and collapse only at eval,
+        # so an absorbed pair reads as one dict holding two ids. No constant
+        # to keep in step, and it fails loudly on the one thing the other
+        # arms cannot see.
+        #
+        # THE SECOND VERSION took the row count from `len(CARRIED)` -- the
+        # LIVE list -- which is the same check on a healthy file and a false
+        # alarm the moment a test appends a row in memory. Three do, and this
+        # arm reddened a clean tree from inside `--check`, which those same
+        # tests assert returns 0. A guard that fires on its own fixtures gets
+        # exempted within a day ((mz)); source-versus-source cannot.
+        n_ids, n_rows = _source_row_counts()
+        if n_ids != n_rows:
+            print("audit_session_state: FAIL — the carried list is malformed: "
+                  f"{n_ids} row id(s) in the SOURCE but {n_rows} row(s) "
+                  "parsed. A dropped `},{` between two rows makes Python read "
+                  "them as ONE dict, the later `\"id\"` wins, and the earlier "
+                  "row is silently absorbed -- the file still parses and the "
+                  "count still looks plausible.")
+            return 1
+        missing = [i.get("id") for i in CARRIED if not i.get("id")]
+        if missing:
+            print(f"audit_session_state: FAIL — {len(missing)} row(s) have "
+                  "no id.")
+            return 1
+        for i in CARRIED:
+            for field in ("owner", "what", "why_open", "closes_when"):
+                if not i.get(field):
+                    print(f"audit_session_state: FAIL — carried row "
+                          f"{i.get('id')!r} has no {field}.")
+                    return 1
+
+        # STRUCTURE BEFORE CONTENT, and the ordering is load-bearing: `stale`
+        # and `orphan` are both computed FROM this list, so running them on a
+        # malformed one yields confident verdicts about the wrong rows.
         stale = [i["id"] for i, d in carried_status() if d]
         if stale:
             print("audit_session_state: FAIL — carried item(s) whose own "
@@ -1293,6 +1412,15 @@ def main(argv=None):
         # under it. Reported separately from `stale` because the remedy
         # differs — a done row is DELETED, a dead-subject row is RE-POINTED at
         # a living book or closed with a reason.
+        # [(aao)] A THIRD WAY THE LIST ROTS, AND IT PASSED BOTH ARMS ABOVE:
+        # a row SILENTLY EATEN BY A MERGE. Resolving a conflict between two
+        # sessions' added rows, a dropped `},{` between them makes Python read
+        # the pair as ONE dict literal -- the later `"id"` wins, the earlier
+        # row's fields are absorbed, the file PARSES, and the count looks
+        # plausible. Measured: 22 rows merged to 21 and `--check` said "none
+        # stale, none orphaned", because neither arm asks whether a row is
+        # MISSING.
+        #
         orphan = subject_status()
         if orphan:
             print("audit_session_state: FAIL — carried item(s) pointed at a "
@@ -1314,6 +1442,39 @@ def main(argv=None):
 
 
 def selftest():
+    # [(aao)] THE SOURCE-VS-PARSE ARM NEEDS ITS OWN CONTROL, because a guard
+    # that is VACUOUS and one that is CORRECT are byte-identical on a healthy
+    # list. Measured: breaking the real list reddened `--check`, and two
+    # mutations that made the guard compare the parse to ITSELF both ran
+    # green -- the guard could not tell me it had stopped working.
+    #
+    # So RUN THE REAL GUARD against a planted defect, in a subprocess, on a
+    # temp copy of this file. Nothing here re-implements the check; if the
+    # guard is hollowed out, this arm goes red.
+    import subprocess as _sp
+    import sys as _sys
+    import tempfile as _tf
+    _src = pathlib.Path(__file__).read_text()
+    _n_ids, _n_rows = _source_row_counts(_src)
+    assert _n_ids == _n_rows == len(CARRIED), (
+        f"source row counts {(_n_ids, _n_rows)} disagree with the parsed "
+        f"list ({len(CARRIED)})")
+    # Drop ONE row boundary: the two dicts then parse as one, the later "id"
+    # wins, and a row is silently absorbed.
+    _eaten = _src.replace("    },\n    {\n", "", 1)
+    assert _eaten != _src, "the fixture found no row boundary to remove"
+    with _tf.TemporaryDirectory() as _d:
+        _f = pathlib.Path(_d) / "session_state_eaten.py"
+        _f.write_text(_eaten)
+        _r = _sp.run([_sys.executable, str(_f), "--check"],
+                     capture_output=True, text=True, cwd=ROOT, timeout=180)
+    assert _r.returncode != 0, (
+        "a row eaten by a dropped `},{` did NOT redden --check; the "
+        "source-vs-parse arm is vacuous:\n" + (_r.stdout or _r.stderr))
+    assert "malformed" in (_r.stdout + _r.stderr), (
+        "--check went red for some OTHER reason than the eaten row:\n"
+        + (_r.stdout or _r.stderr))
+
     # every row is well-formed and its predicate is callable and total
     ids = [i["id"] for i in CARRIED]
     assert len(ids) == len(set(ids)), f"duplicate carried id: {ids}"

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "downtrend-ensemble-bot"
+version = "0.1.0"
+description = "Backtest-first short-biased perpetual futures ensemble with regime-aware long support"
+requires-python = ">=3.11"
+# PyYAML is the ONLY runtime dependency. pandas and numpy were declared in an
+# earlier draft and never imported -- an unused dependency is an attack surface,
+# a wheel to build and a version to pin, bought for nothing. Indicators are
+# hand-written over plain lists, which also makes `assert_causal` meaningful:
+# there is no vectorised call that could quietly read past bar i.
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+# The real exchange is OPTIONAL and OFF by default. Installing this extra does
+# not enable live trading -- see config.LiveGate.
+exchange = ["ccxt>=4.2"]
+
+[project.scripts]
+downtrend-bot = "downtrend_bot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

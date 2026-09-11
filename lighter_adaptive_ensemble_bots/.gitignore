@@ -1,0 +1,29 @@
+# Fetched tape. Large, reproducible, and it changes every hour -- committing it
+# would make the diff useless and the repo heavy. Re-fetch with any data
+# command, or `discover-markets` + `backtest`.
+data/raw/*.json
+
+# Runtime state is per-machine and per-run: nonces, health, budgets, soak.
+# A nonce store in particular must NEVER be shared between machines.
+state/*.json
+state/*.tmp
+
+# The kill switch is an operational act, never a committed file. The .example
+# is tracked; the switch itself is not.
+runtime/KILL_SWITCH
+
+# Generated reports. All of them: the negation that used to sit here kept
+# `reports/pnl_baseline.json`, and it was pointing at the wrong copy --
+# MEASURED byte-identical to `docs/pnl_baseline.json`, which is tracked and is
+# the path the changelog entry actually cites. Two copies of one piece of
+# evidence is how the two drift, and the `reports/` one is rewritten by any
+# run of `dashboard_patch`. The canonical baseline lives in `docs/`.
+# `.gitkeep` is NOT matched, so the directory stays tracked.
+reports/*.json
+reports/*.log
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/

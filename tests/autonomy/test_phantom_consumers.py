@@ -109,7 +109,21 @@ def test_the_brain_drops_halt_events_from_a_clean_interpreter():
     for a whole deploy — an import inside a swallowing `except` is a silent
     kill switch."""
     r = _clean(
-        "import sys, types\n"
+        "import io, json as _json, sys, types, urllib.request\n"
+        # THE FEED IS STUBBED, THE FUNCTION IS NOT. Two hazards, both
+        # measured, and the second is the worse one:
+        #  1. the real read is a ~51KB fetch of the LIVE dashboard and it
+        #     truncated once tonight -- IncompleteRead(15472 of 51194),
+        #     then fetched cleanly 6/6.
+        #  2. `RECEIPT 4` is an EXACT count, so it only ever held because
+        #     the live feed happens to carry zero phantom closes (measured
+        #     11-Sep: 125 rows, 0 phantom). The first real halt-and-flatten
+        #     -- the exact event this file exists for, and which gave avo 9
+        #     phantom rows of 15 -- would push the receipt above 4 and
+        #     redden CI on EVERY pr in the repo, for a reason no author
+        #     could connect to their change.
+        "urllib.request.urlopen = (lambda *a, **k:\n"
+        "    io.BytesIO(_json.dumps({'trades': []}).encode()))\n"
         "PH = {'bot':'x','profit_abs':0.0,'open_rate':None,'pnl_pct':0.0,\n"
         "      'is_open':False,'reason':'long_daily_loss'}\n"
         "REAL = {'bot':'x','profit_abs':-1.2,'open_rate':0.31,'pnl_pct':-0.004,\n"
@@ -198,7 +212,21 @@ def test_the_brain_publishes_how_many_events_it_dropped():
         "ran clean on a run where it never ran at all")
 
     r = _clean(
-        "import sys, types\n"
+        "import io, json as _json, sys, types, urllib.request\n"
+        # THE FEED IS STUBBED, THE FUNCTION IS NOT. Two hazards, both
+        # measured, and the second is the worse one:
+        #  1. the real read is a ~51KB fetch of the LIVE dashboard and it
+        #     truncated once tonight -- IncompleteRead(15472 of 51194),
+        #     then fetched cleanly 6/6.
+        #  2. `RECEIPT 4` is an EXACT count, so it only ever held because
+        #     the live feed happens to carry zero phantom closes (measured
+        #     11-Sep: 125 rows, 0 phantom). The first real halt-and-flatten
+        #     -- the exact event this file exists for, and which gave avo 9
+        #     phantom rows of 15 -- would push the receipt above 4 and
+        #     redden CI on EVERY pr in the repo, for a reason no author
+        #     could connect to their change.
+        "urllib.request.urlopen = (lambda *a, **k:\n"
+        "    io.BytesIO(_json.dumps({'trades': []}).encode()))\n"
         "PH = {'bot':'x','profit_abs':0.0,'open_rate':None,'pnl_pct':0.0,\n"
         "      'is_open':False,'reason':'long_daily_loss'}\n"
         "REAL = {'bot':'x','profit_abs':-1.2,'open_rate':0.31,'pnl_pct':-0.004,\n"
@@ -232,3 +260,142 @@ def test_zero_and_none_are_distinguishable_on_the_receipt():
         for h in handlers for s in ast.walk(h))
     assert assigns_none, (
         "the fail-open path must set _PHANTOM_EXCLUDED = None, never 0")
+
+
+# ------------------------------------------------- the ledger read itself ---
+# [2026-09-11] A single truncated read used to kill the whole brain run, and
+# nothing recorded it: `run_all.sh` runs this brain as `python3 bot_learn.py ||
+# true` on a 2h loop, NOT through `organ_main`, so the exception is swallowed
+# by the shell. MEASURED that day: IncompleteRead(15472 of 51194 bytes) on a
+# payload that then fetched cleanly 6/6. Cost of that one read: two hours of
+# brain blindness nobody is told about, and `brain-vitals` (7.2h TTL) cannot
+# page until ~3 missed runs.
+def _reader():
+    import importlib
+    return importlib.import_module("bot_learn")
+
+
+def _fake_urlopen(seq):
+    """Yield one scripted outcome per call: an Exception to raise, or bytes."""
+    import io
+    calls = {"n": 0}
+
+    def _open(*_a, **_k):
+        i = calls["n"]
+        calls["n"] += 1
+        out = seq[min(i, len(seq) - 1)]
+        if isinstance(out, BaseException):
+            raise out
+        return io.BytesIO(out)
+    return _open, calls
+
+
+def test_a_truncated_ledger_read_is_retried_rather_than_killing_the_run(
+        monkeypatch):
+    """The exact fault that was measured, replayed."""
+    import http.client as _h
+    bl = _reader()
+    body = b'{"trades": [{"bot": "x", "is_open": false}]}'
+    opener, calls = _fake_urlopen([_h.IncompleteRead(b"partial", 35722), body])
+    monkeypatch.setattr(bl.urllib.request, "urlopen", opener)
+    monkeypatch.setattr(bl.time, "sleep", lambda *_a: None)
+    got = bl._read_json_url("http://x/y", timeout=1, tries=3)
+    assert got == {"trades": [{"bot": "x", "is_open": False}]}
+    assert calls["n"] == 2, "it did not retry the truncated read"
+
+
+def test_an_exhausted_ledger_read_RAISES_and_never_degrades_to_empty(
+        monkeypatch):
+    """I4, and this is the assertion that matters most in this file.
+
+    Returning `[]` here would be byte-identical to "no bot closed a trade": the
+    brain would grade every bucket on an empty sample and publish fresh-looking
+    vitals off it, and no reader could tell the difference. A raise leaves the
+    keys STALE, and staleness is the one thing a reader can detect (I1)."""
+    import http.client as _h
+    bl = _reader()
+    opener, calls = _fake_urlopen([_h.IncompleteRead(b"p", 9)])
+    monkeypatch.setattr(bl.urllib.request, "urlopen", opener)
+    monkeypatch.setattr(bl.time, "sleep", lambda *_a: None)
+    with pytest.raises(Exception) as ei:
+        bl._read_json_url("http://x/y", timeout=1, tries=3)
+    assert not isinstance(ei.value, AssertionError)
+    assert calls["n"] == 3, "it did not use every attempt before giving up"
+
+
+def test_a_4xx_is_not_retried_because_it_is_a_condition_not_a_hiccup(
+        monkeypatch):
+    """`HTTPError` is a SUBCLASS of `URLError`, so a bare "retry URLError"
+    silently retries 404s too — and the first version of this helper carried a
+    comment claiming the opposite. Pinned so the comment can never drift from
+    the code again."""
+    import urllib.error as _ue
+    bl = _reader()
+    err = _ue.HTTPError("http://x/y", 404, "gone", {}, None)
+    opener, calls = _fake_urlopen([err])
+    monkeypatch.setattr(bl.urllib.request, "urlopen", opener)
+    monkeypatch.setattr(bl.time, "sleep", lambda *_a: None)
+    with pytest.raises(_ue.HTTPError):
+        bl._read_json_url("http://x/y", timeout=1, tries=3)
+    assert calls["n"] == 1, "a 404 was retried"
+
+
+def test_a_5xx_and_a_429_ARE_retried(monkeypatch):
+    """The other half of the same rule — the server asking us to come back."""
+    import urllib.error as _ue
+    bl = _reader()
+    for code in (429, 503):
+        err = _ue.HTTPError("http://x/y", code, "later", {}, None)
+        opener, calls = _fake_urlopen([err, b'{"trades": []}'])
+        monkeypatch.setattr(bl.urllib.request, "urlopen", opener)
+        monkeypatch.setattr(bl.time, "sleep", lambda *_a: None)
+        assert bl._read_json_url("http://x/y", timeout=1, tries=3) == {
+            "trades": []}
+        assert calls["n"] == 2, f"HTTP {code} was not retried"
+
+
+def test_the_ledger_reader_is_the_one_the_brain_actually_calls():
+    """A retry helper nothing calls is the registered-but-inert failure. Pinned
+    by AST so a future edit cannot quietly restore the bare `urlopen`."""
+    import ast
+    src = (ROOT / "bot_learn.py").read_text()
+    fn = next(n for n in ast.walk(ast.parse(src))
+              if isinstance(n, ast.FunctionDef) and n.name == "_fetch_trades")
+    calls = [n.func.id for n in ast.walk(fn)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
+    assert "_read_json_url" in calls, "_fetch_trades no longer uses the reader"
+    opens = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Attribute) and n.func.attr == "urlopen"]
+    assert not opens, "a bare urlopen came back into _fetch_trades"
+
+
+def test_the_SHIPPED_default_actually_retries(monkeypatch):
+    """The mutation that survived the first round, and why it mattered: every
+    test above passes `tries=3` explicitly, so `LEDGER_TRIES = 1` would have
+    removed the retry from PRODUCTION while the whole file stayed green. The
+    call site in `_fetch_trades` uses the DEFAULT, so the default is what has
+    to be pinned."""
+    import http.client as _h
+    bl = _reader()
+    assert bl.LEDGER_TRIES >= 2, "the shipped default does not retry at all"
+    opener, calls = _fake_urlopen([_h.IncompleteRead(b"p", 9), b'{"trades": []}'])
+    monkeypatch.setattr(bl.urllib.request, "urlopen", opener)
+    monkeypatch.setattr(bl.time, "sleep", lambda *_a: None)
+    bl._read_json_url("http://x/y", timeout=1)          # <- NO tries= argument
+    assert calls["n"] == 2, "the default path did not retry"
+
+
+def test_the_try_count_is_resolved_at_call_time_not_baked_into_the_signature(
+        monkeypatch):
+    """`def f(tries=LEDGER_TRIES)` evaluates once at import, so the env var
+    would read as live and be frozen after load. Pinned by moving the module
+    constant and requiring the next call to see it."""
+    import http.client as _h
+    bl = _reader()
+    monkeypatch.setattr(bl, "LEDGER_TRIES", 5)
+    opener, calls = _fake_urlopen([_h.IncompleteRead(b"p", 9)])
+    monkeypatch.setattr(bl.urllib.request, "urlopen", opener)
+    monkeypatch.setattr(bl.time, "sleep", lambda *_a: None)
+    with pytest.raises(Exception):
+        bl._read_json_url("http://x/y", timeout=1)
+    assert calls["n"] == 5, "the signature froze the try count at import"

@@ -1,0 +1,128 @@
+# LIVE. This file alone does NOT enable trading. Live mode additionally needs:
+#   ENABLE_LIVE_TRADING=true
+#   LIVE_CONFIRMATION=I_UNDERSTAND_THE_RISK
+#   an interactive confirmation typed at the prompt
+#   a passing pre-flight (metadata, reconciliation, protective orders, nonce)
+#   30 days and 100 valid paper/shadow signals of soak
+#   no runtime/KILL_SWITCH
+#
+# The numbers below are deliberately TIGHTER than config/backtest.yaml: half
+# the per-trade risk, four positions instead of six, and a higher score bar.
+# Start small; the hard ceilings in config.HARD_CEILINGS are a maximum, never
+# a target.
+# Default mode. Nothing here can reach the venue with a signature.
+mode: live
+exchange: lighter
+log_level: INFO
+
+lighter:
+  base_url: https://mainnet.zklighter.elliot.ai
+  chain_id: 304
+  target_max_leverage: 10
+  use_websocket: true
+  use_native_sdk: true
+  require_market_metadata_validation: true
+  require_reduce_only_exits: true
+  require_protective_exit_confirmation: true
+  margin_mode: isolated
+
+# Empty = the most liquid complete markets, chosen from LIVE metadata.
+# Populate with `discover-markets` output when you want a fixed universe.
+symbols: []
+
+timeframes:
+  regime: 4h
+  signal: 1h
+  execution: 15m
+
+risk:
+  risk_per_trade: 0.002
+  max_portfolio_risk: 0.012
+  max_daily_loss: 0.025
+  max_weekly_loss: 0.07
+  max_leverage: 10
+  max_margin_utilisation: 0.35
+  max_concurrent_positions: 4
+  max_notional_per_market_percent: 25
+  max_gross_notional_percent: 150
+  max_net_long_notional_percent: 100
+  max_net_short_notional_percent: 100
+  min_stop_to_liquidation_atr: 2.0
+  collateral_buffer_pct: 0.15
+
+strategy:
+  long_minimum_score: 68
+  short_minimum_score: 68
+  neutral_minimum_score: 68
+  bearish_tactical_long_minimum_score: 75
+  minimum_reward_risk: 1.4
+  neutral_minimum_reward_risk: 1.6
+  adx_threshold: 20
+  max_entry_distance_atr: 1.0
+  max_holding_days: 7
+  atr_stop_buffer: 0.25
+  max_stop_distance_atr: 3.0
+  tp1_r: 1.20
+  tp1_fraction: 0.30
+  tp2_r: 2.00
+  tp2_fraction: 0.35
+
+regime:
+  enabled: true
+  bullish_long_risk_multiplier: 1.0
+  bullish_short_risk_multiplier: 0.25
+  neutral_risk_multiplier: 0.75
+  bearish_long_risk_multiplier: 0.25
+  bearish_short_risk_multiplier: 1.0
+  high_volatility_risk_multiplier: 0.50
+  panic_risk_multiplier: 0.0
+  minimum_confirmation_candles: 2
+  high_volatility_atr_percentile: 90
+
+strategy_health:
+  enabled: true
+  warning_trade_count: 20
+  hard_pause_trade_count: 30
+  throttle_profit_factor: 0.85
+  pause_profit_factor: 0.65
+  throttle_expectancy: 0.0
+  max_consecutive_losses: 4
+  warning_drawdown: 0.05
+  hard_drawdown: 0.08
+  recovery_risk_multiplier: 0.25
+
+overtrading:
+  max_entries_per_market_per_day: 3
+  max_entries_per_strategy_per_day: 10
+  max_portfolio_entries_per_hour: 5
+  cooldown_after_loss_hours: 6
+  cooldown_after_profit_hours: 2
+  cooldown_after_breakeven_hours: 3
+  minimum_signal_score_separation: 5
+  require_fresh_setup_for_reentry: true
+
+execution:
+  max_spread_bps: 10
+  max_slippage_bps: 15
+  order_timeout_seconds: 30
+  entry_preference: post_only_limit
+  use_ioc_when_necessary: true
+  use_reduce_only_exits: true
+  require_native_stop_or_fail: true
+  # Lighter currently reports taker_fee and maker_fee of 0.0000 on every
+  # active market. These are CONFIG, not constants: re-check the venue's own
+  # fee documentation and `discover-markets` output before trusting a zero.
+  taker_fee: 0.0
+  maker_fee: 0.0
+  latency_ms: 250
+
+# Modelled frictions for the backtester. Every one of these flatters the
+# result if it is set too low; they are the first thing to stress.
+backtest:
+  spread_bps: 2.0
+  slippage_bps: 3.0
+  funding_per_hour: 0.0000171     # +ve = LONGS pay. Measured median on this
+                                  # venue's majors: ~+0.0171%/DAY.
+  post_only_miss_rate: 0.25
+  partial_fill_rate: 0.10
+  partial_fill_fraction: 0.6

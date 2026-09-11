@@ -2,6 +2,12 @@
 .env
 .env.*
 !.env.perps.example
+# Template files that carry NO secrets and MUST ship: the README of each
+# package tells the reader to copy one. They were silently excluded by the
+# `.env.*` rule above -- found when `lighter_adaptive_ensemble_bots/.env.example`
+# turned out to exist on disk and never in a commit.
+!*.env.example
+!**/.env.example
 *.key
 *.pem
 secrets.json
