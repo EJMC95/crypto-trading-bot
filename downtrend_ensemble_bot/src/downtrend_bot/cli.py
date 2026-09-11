@@ -135,9 +135,35 @@ def cmd_walk_forward(cfg: AppConfig, args) -> int:
 
 
 def cmd_sensitivity(cfg: AppConfig, args) -> int:
-    from .walk_forward import sensitivity
-    rep = sensitivity(cfg, _markets(cfg), _tapes(cfg, args),
-                      frictions=_frictions(cfg))
+    """N full backtests, one per swept value. It is SLOW by construction, so
+    it prints every cell as it lands -- a sweep that prints nothing for an hour
+    is indistinguishable from a sweep that has hung, and the first thing anyone
+    does about that is kill it and never run it again."""
+    import time as _t
+
+    from .walk_forward import default_grid, sensitivity
+    grid = default_grid(cfg)
+    grid.pop("_shipped", None)
+    if args.only:
+        grid = {k: v for k, v in grid.items() if any(o in k for o in args.only)}
+        if not grid:
+            raise SystemExit(f"--only {args.only} matched no parameter. "
+                             f"Known: {', '.join(sorted(default_grid(cfg)))}")
+    total = sum(len(v) for v in grid.values()) + 1
+    t0 = _t.time()
+    done = [0]
+
+    def tick(line: str) -> None:
+        done[0] += 1
+        el = _t.time() - t0
+        eta = (el / done[0]) * (total - done[0]) if done[0] else 0.0
+        print(f"  [{done[0]:>3}/{total}] {line}   (elapsed {el / 60:.1f}m, "
+              f"~{eta / 60:.1f}m left)", flush=True)
+
+    print(f"sweeping {total} cells across {len(grid)} parameter(s). Each cell "
+          f"is a FULL backtest.", flush=True)
+    rep = sensitivity(cfg, _markets(cfg), _tapes(cfg, args), grid=grid,
+                      frictions=_frictions(cfg), progress=tick)
     text = render_sensitivity(rep)
     print(text)
     write_json(cfg.reports_dir, "sensitivity.json", rep)
@@ -301,6 +327,9 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--validate", type=int, default=60)
     w.add_argument("--test", type=int, default=60)
     s = sub.add_parser("sensitivity"); data_args(s)
+    s.add_argument("--only", action="append",
+                   help="sweep only parameters whose path contains this "
+                        "(repeatable). The full grid is ~41 full backtests.")
 
     for name in ("paper", "live"):
         sp = sub.add_parser(name)

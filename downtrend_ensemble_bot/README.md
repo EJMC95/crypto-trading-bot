@@ -83,6 +83,23 @@ python -m downtrend_bot.cli --config config/backtest.yaml walk-forward --data da
 python -m downtrend_bot.cli --config config/backtest.yaml sensitivity --data data/examples
 ```
 
+**The sweep is slow by construction** — one full backtest per swept value, ~40
+of them on the default grid. It prints every cell with an ETA as it lands (a
+tool that prints nothing for half an hour gets killed once and never run
+again), and `--only` scopes it:
+
+```bash
+python -m downtrend_bot.cli --config config/backtest.yaml sensitivity \
+    --data data/examples --only minimum_score --only adx_threshold
+```
+
+It reports the **curve**, never a winner. There is no "best" key and nothing
+downstream reads one: picking the best of N cells inflates its statistic by
+roughly the spread of the unselected ones. Read the shape — a **PLATEAU**
+across neighbouring values is evidence, a **SENSITIVE** sign-flip is a warning,
+and an **INERT** parameter is a knob that reached no decision on this tape and
+should be declared rather than tuned.
+
 `backtest` exits **2** when the robustness gate refuses the configuration, so a
 CI job cannot go green on a result the gate rejected.
 

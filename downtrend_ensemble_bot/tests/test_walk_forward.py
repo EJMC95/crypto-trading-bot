@@ -1,6 +1,7 @@
 """Walk-forward, the sensitivity sweep, and the CLI's refusals."""
 import json
 import os
+import re
 
 import pytest
 
@@ -238,3 +239,36 @@ def test_make_examples_writes_tapes_the_loader_can_read(tmp_path, cfg, capsys):
                    cfg.timeframes.execution):
             assert tape.get(tf), (sym, tf)
             assert all(b.high >= b.low for b in tape[tf])
+
+
+def test_the_sweep_reports_progress_rather_than_going_silent(cfg, markets,
+                                                             capsys):
+    """40 full backtests is a long silence, and the first thing anyone does
+    about an hour of no output is kill it and never run it again. The `--only`
+    filter exists for the same reason: a sweep you cannot scope is a sweep you
+    cannot run."""
+    import types
+
+    from downtrend_bot.cli import cmd_sensitivity
+    args = types.SimpleNamespace(data=None, bars=300, seed=4,
+                                 only=["minimum_score"])
+    assert cmd_sensitivity(cfg, args) == 0
+    out = capsys.readouterr().out
+    assert "sweeping" in out and "FULL backtest" in out
+    # The total counts the swept cells PLUS the shipped reference run, so pin
+    # the SHAPE of the progress line rather than an arithmetic I would have to
+    # keep in step with the implementation.
+    assert re.search(r"\[\s*\d+/\d+\] strategy\.minimum_score=", out), \
+        "no per-cell progress line"
+    assert "left)" in out, "no ETA"
+
+
+def test_an_only_filter_that_matches_nothing_says_so(cfg):
+    """Rather than sweeping the whole grid, or silently sweeping nothing."""
+    import types
+
+    from downtrend_bot.cli import cmd_sensitivity
+    args = types.SimpleNamespace(data=None, bars=300, seed=4,
+                                 only=["no_such_knob"])
+    with pytest.raises(SystemExit, match="matched no parameter"):
+        cmd_sensitivity(cfg, args)
