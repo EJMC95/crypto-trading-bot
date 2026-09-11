@@ -1,4 +1,78 @@
 
+## 2026-09-11 (abi) — 👩 MUM'S DRAWDOWN GUARD: A RAIL THAT RE-CREATES ITSELF CANNOT BE RELEASED, ONLY RE-LEVELLED — 0.15 → 0.25, AND IT IS AN ENV NOW SO THE NEXT ONE COSTS A VARIABLE INSTEAD OF A MERGE
+
+**Eamon, 11-Sep: *"Do it"* / *"Deploy her"*, after being given the two routes and
+the number behind each.** `(abg)` fixed a stale cap and `(abh)` released the latch
+that stale cap had written; she came back **online** and was immediately held by a
+THIRD rail. **This is the only protection THRESHOLD moved today**, and it is a
+real loosening rather than a correction, so it is recorded as one.
+
+**WHY `FAMILY_CLEAR_GUARD` COULD NOT DO IT, measured rather than assumed.** The
+switch was set exactly as asked. It fired, and the lock **re-armed inside the same
+boot**: `entry_vetoes.locked_until` moved **01:18:57Z → 01:28:19Z**, a fresh 12h
+stamp at the restart instant. The reason is the difference between the two kinds
+of lock, and it is the transferable half of this entry:
+
+* `(abh)`'s daily-loss latch is a **stored record**. It outlived the constant that
+  wrote it, so dropping it was a consequence of fixing that constant.
+* `maxdd` is **re-derived from live trades every cycle**. `FAMILY_CLEAR_GUARD`
+  drops the lock RESTORED at boot; the protections then recompute and re-impose
+  it, because the condition still holds.
+
+**A RAIL THAT RE-CREATES ITSELF CANNOT BE RELEASED — ONLY ITS LEVEL CAN MOVE.**
+A future session reaching for a clear-switch on a re-derived lock should expect
+exactly this and go to the threshold instead.
+
+**AND THE CONDITION GENUINELY HOLDS.** Replayed against her own ledger: **40
+closes** in her 72h window (the guard needs 8) and a worst in-window drawdown of
+**17.3%** of `START_EQUITY` against the **15%** trigger. Not stale, not wrong — so
+it was put to Eamon as a decision rather than cleared as a defect, and he took it.
+
+**0.25 IS NOT A NUMBER THIS ENTRY INVENTED:** two sibling books in the same file
+already run `dd: 0.25` (`lighter_family_bot.py` :1082, :1671), so it is the
+in-fleet value for a book allowed more drawdown room. Pinned by test, so if the
+siblings ever move, this entry's justification has to be re-stated rather than
+silently inherited.
+
+**ENV-TUNABLE, because the literal is what cost a deploy cycle.** A 12-hour entry
+lock required a commit, CI, a merge and a container restart purely because the
+number was hard-coded — the (I18) shape: the gate that actually binds was not a
+reachable lever. `MUM_MAXDD_DD` now reaches it, caged **[0.05, 0.50]**:
+* below **0.05** the guard fires on noise;
+* above **0.50** it could never fire before the book's own all-slots-stop
+  (`gross × |stop|` = 9.5 × 4% = **38%** at the leverage Eamon keeps), which is
+  precisely the halt-before-stop mis-ordering `(abg)` spent the session on. The
+  ceiling exists so this rail cannot be levelled into the same defect.
+Unparseable or out-of-cage degrades to the **shipped value**, never to a guess and
+never to "no guard": CLAUDE.md's permanent doctrine is explicit that a rail's
+VALUES are delegated and its EXISTENCE is not.
+
+**A MUTATION FOUND DEAD CODE IN MY OWN GUARD, which is the (I3) point working.**
+The first version carried a separate `NaN`/`inf` branch. Deleting it changed **no
+outcome** while every other mutation reddened — because the cage already rejects
+both (every comparison against `NaN` is False, and an infinity is outside any
+finite bound). A line that cannot change a result is the can-never-fire shape this
+repo treats as a defect, so it is **gone**, and a test now pins that the CAGE is
+what rejects them. Re-verified after: removing the cage reddens.
+
+**WHAT THIS DOES NOT DO, and no session may cite this entry as if it did.** Her
+**17.3%** drawdown is still OVER the **15%** bar the go-live gate uses to decide
+whether a book may hold real money at all. This moves HER OWN guard's trigger; it
+does not move the grade, `scripts/golive_readiness.py` is untouched, and `(abe)`'s
+reading — bot-only maxDD **17.64%**, **FAILS** the bar — stands exactly as
+published. Her other protections are unchanged and pinned: `slguard` 3 stops /
+24h → 6h off, `cooldown_candles` 2.
+
+**TESTS: `tests/autonomy/test_mum_maxdd_lever.py`, 19 tests; 7 of 8 mutations
+killed with the survivor being the dead-code finding above, plus a POSITIVE
+CONTROL** (a reworded comment must survive). Killed: an out-of-cage value
+honoured, unparseable degrading to zero, the carrier reverting to a literal, the
+default slipping back to 0.15, the ceiling dropped below all-slots-stop, and
+`slguard` silently widened alongside. Her existing 31 `test_mum_v2.py` tests
+still pass — the change must not perturb the book it is for. Era **NOT** reset (a
+protection level is not a policy change; the entry signature is untouched).
+Revert: `MUM_MAXDD_DD=0.15`.
+
 ## 2026-09-11 (abh) — THE DURABLE DAILY-LOSS LATCH GETS AN AUDITABLE RELEASE, AND IT CANNOT DISABLE THE RAIL: 👩 mum's latch outlived the constant that caused it
 
 **Eamon, 11-Sep: *"I want to resume trading now"*, then *"Ive given you
