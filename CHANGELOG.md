@@ -573,7 +573,7 @@ the vacuity). The transferable half: **a guard that reads BOTH of its numbers fr
 artefact it is guarding cannot be fooled by the process running it** — mixing a
 source-derived number with a runtime-derived one measures the harness as much as the
 file.
-  ENFORCED BY: `scripts/session_state.py::_source_row_count`,
+  ENFORCED BY: `scripts/session_state.py::_source_row_counts`,
   `scripts/session_state.py::selftest`
 ## 2026-09-11 (aan) — 🎫 THE TAKER'S GO-LIVE IS NOT A BAD TRADE, IT IS A NO-OP: ITS LIVE ARM MAY FILL EXACTLY ONE FAMILY, AND THE BOOK HAS VETOED IT
 
